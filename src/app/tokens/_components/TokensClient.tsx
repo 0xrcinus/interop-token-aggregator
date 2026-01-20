@@ -126,14 +126,15 @@ export function TokensClient() {
         <Card>
           <CardHeader>
             <CardTitle>
-              {isLoading ? "Loading..." : `${tokens.length} Tokens`}
+              {isLoading ? "Loading..." : "Search Results"}
             </CardTitle>
             <CardDescription>
-              Aggregated token data from multiple providers
-              {!isLoading && total > 0 && (
-                <span className="block mt-1">
-                  Showing {(page - 1) * itemsPerPage + 1}-{Math.min(page * itemsPerPage, total)} of {total.toLocaleString()} total tokens
-                </span>
+              {isLoading ? (
+                "Fetching token data..."
+              ) : total > 0 ? (
+                `Showing ${(page - 1) * itemsPerPage + 1}-${Math.min(page * itemsPerPage, total)} of ${total.toLocaleString()} total tokens`
+              ) : (
+                "No tokens found"
               )}
             </CardDescription>
           </CardHeader>

@@ -637,20 +637,38 @@ export const revalidate = 300
 ✅ **Simple**: No configuration needed, works out of the box
 ✅ **Flexible**: Adjust per page if needed
 
-### Production: Automatic Scheduled Fetches
+### 3. Automatic Scheduled Fetches (Production)
 
-For automatic scheduled fetches in production, add to `vercel.json`:
+The application includes a Vercel Cron Job that automatically fetches fresh data every 12 hours:
 
+**Configuration**: See [vercel.json](vercel.json)
 ```json
 {
   "crons": [{
     "path": "/api/admin/fetch",
-    "schedule": "0 */6 * * *"
+    "schedule": "0 */12 * * *"
   }]
 }
 ```
 
-This triggers a fetch every 6 hours and automatically revalidates all pages.
+**Cron Schedule**: `0 */12 * * *` = Every 12 hours at the top of the hour (12:00 AM, 12:00 PM UTC)
+
+**How it Works**:
+- Vercel automatically calls `GET /api/admin/fetch` on the defined schedule
+- Vercel sets the `Authorization: Bearer <CRON_SECRET>` header automatically
+- The endpoint triggers a fresh data fetch from all 12 providers
+- All static pages are automatically revalidated after the fetch completes
+
+**Customizing the Schedule**:
+To change the frequency, edit the `schedule` field in [vercel.json](vercel.json):
+- `0 */6 * * *` = Every 6 hours
+- `0 */12 * * *` = Every 12 hours (current)
+- `0 0 * * *` = Once per day at midnight UTC
+- `0 0 * * 0` = Once per week on Sunday at midnight UTC
+
+See [Vercel Cron documentation](https://vercel.com/docs/cron-jobs) for more schedule options.
+
+**Note**: The `CRON_SECRET` environment variable is automatically set by Vercel in production. You don't need to configure it manually.
 
 ### Alternative: Dynamic Rendering
 

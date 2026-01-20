@@ -4,9 +4,12 @@ import { NextResponse } from "next/server"
 import { revalidatePath } from "next/cache"
 
 /**
- * POST /api/admin/fetch
+ * POST/GET /api/admin/fetch
  * Triggers the provider fetch job
- * Requires ADMIN_SECRET header for authentication
+ *
+ * Authentication:
+ * - POST: Requires x-admin-secret header matching ADMIN_SECRET env var
+ * - GET: Supports both x-admin-secret header AND Vercel Cron (Authorization: Bearer CRON_SECRET)
  *
  * Effect-based implementation:
  * 1. Validate authentication
@@ -14,16 +17,24 @@ import { revalidatePath } from "next/cache"
  * 3. Run Effect program and return results
  * 4. Revalidate static pages to reflect new data
  */
-export async function POST(request: Request) {
-  // Check authentication
+
+async function handleFetch(request: Request) {
+  // Check authentication - support both manual trigger and Vercel Cron
   const adminSecret = request.headers.get("x-admin-secret")
+  const authHeader = request.headers.get("authorization")
   const expectedSecret = process.env.ADMIN_SECRET
+  const cronSecret = process.env.CRON_SECRET
 
-  if (!expectedSecret) {
-    return NextResponse.json({ error: "Admin secret not configured" }, { status: 500 })
-  }
+  // Manual trigger authentication
+  const isValidAdminAuth = expectedSecret && adminSecret === expectedSecret
 
-  if (adminSecret !== expectedSecret) {
+  // Vercel Cron authentication (GET requests only)
+  const isValidCronAuth = cronSecret && authHeader === `Bearer ${cronSecret}`
+
+  if (!isValidAdminAuth && !isValidCronAuth) {
+    if (!expectedSecret && !cronSecret) {
+      return NextResponse.json({ error: "Admin secret not configured" }, { status: 500 })
+    }
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -58,5 +69,17 @@ export async function POST(request: Request) {
   revalidatePath("/tokens")
   console.log("[API /admin/fetch] Revalidation complete")
 
-  return NextResponse.json(result)
+  return NextResponse.json({
+    ...result,
+    triggeredBy: isValidCronAuth ? "vercel-cron" : "manual",
+  })
+}
+
+// Export both GET and POST handlers
+export async function POST(request: Request) {
+  return handleFetch(request)
+}
+
+export async function GET(request: Request) {
+  return handleFetch(request)
 }

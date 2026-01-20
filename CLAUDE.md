@@ -445,16 +445,35 @@ Returns detailed information for a specific token symbol, including all instance
 curl http://localhost:3000/api/tokens/USDC
 ```
 
-### POST /api/admin/fetch
+### POST/GET /api/admin/fetch
 Triggers the provider fetch job in the background.
 
-**Authentication**: Requires `x-admin-secret` header matching `ADMIN_SECRET` env var.
+**Authentication**:
+- Manual trigger: Requires `x-admin-secret` header matching `ADMIN_SECRET` env var
+- Vercel Cron: Uses `Authorization: Bearer <CRON_SECRET>` (automatically set by Vercel)
 
-**Response**: 202 Accepted (job runs asynchronously).
+**Response**: Job results with provider counts.
 
+**Manual Trigger**:
 ```bash
+# POST request
 curl -X POST http://localhost:3000/api/admin/fetch \
   -H "x-admin-secret: your-secret-here"
+
+# GET request (for cron compatibility)
+curl http://localhost:3000/api/admin/fetch \
+  -H "x-admin-secret: your-secret-here"
+```
+
+**Automatic Scheduled Fetches**:
+The application includes a Vercel Cron Job configured in `vercel.json` that calls this endpoint every 12 hours:
+```json
+{
+  "crons": [{
+    "path": "/api/admin/fetch",
+    "schedule": "0 */12 * * *"
+  }]
+}
 ```
 
 **Important**: In Next.js 15+, route `params` are async. Always await them:

@@ -2,9 +2,8 @@ import Link from "next/link"
 import { Effect } from "effect"
 import { ProviderApiService, ApiServicesLive } from "@/lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { CheckCircle2, XCircle, ArrowRight } from "lucide-react"
+import { ArrowRight } from "lucide-react"
 
 // Revalidate every 5 minutes as a fallback (in case manual revalidation fails)
 export const revalidate = 300
@@ -29,39 +28,11 @@ export default async function ProvidersPage() {
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
             ← Back to Dashboard
           </Link>
-          <h1 className="text-4xl font-bold">Provider Status</h1>
+          <h1 className="text-4xl font-bold">Providers</h1>
           <p className="text-lg text-muted-foreground">
-            Monitor health and fetch history for all {data.summary.total} bridge providers
+            Browse all {data.summary.total} bridge providers and their token coverage
           </p>
         </header>
-
-        {/* Summary Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Total Providers</CardDescription>
-              <CardTitle className="text-3xl">{data.summary.total}</CardTitle>
-            </CardHeader>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Healthy Providers</CardDescription>
-              <CardTitle className="text-3xl text-green-600 dark:text-green-400">
-                {data.summary.healthy}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Error Providers</CardDescription>
-              <CardTitle className="text-3xl text-red-600 dark:text-red-400">
-                {data.summary.error}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-        </div>
 
         {/* Providers Table */}
         <Card>
@@ -76,8 +47,6 @@ export default async function ProvidersPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Provider</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Success Rate</TableHead>
                   <TableHead className="text-right">Chains</TableHead>
                   <TableHead className="text-right">Tokens</TableHead>
                   <TableHead className="text-right">Fetches</TableHead>
@@ -92,28 +61,6 @@ export default async function ProvidersPage() {
                       <Link href={`/providers/${provider.name}`} className="hover:text-primary">
                         {provider.name}
                       </Link>
-                    </TableCell>
-                    <TableCell>
-                      {provider.status === "healthy" ? (
-                        <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
-                          <CheckCircle2 className="h-4 w-4" />
-                          <span className="text-sm">Healthy</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
-                          <XCircle className="h-4 w-4" />
-                          <span className="text-sm">Error</span>
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge variant={
-                        parseFloat(provider.successRate) === 100 ? "default" :
-                        parseFloat(provider.successRate) >= 80 ? "secondary" :
-                        "destructive"
-                      }>
-                        {provider.successRate}
-                      </Badge>
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {provider.lastFetch.chainsCount ?? "—"}
