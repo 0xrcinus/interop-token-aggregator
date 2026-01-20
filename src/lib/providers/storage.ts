@@ -24,14 +24,32 @@ export const storeProviderData = (
   Effect.gen(function* () {
     const drizzle = yield* Pg.PgDrizzle
 
-    // Insert fetch record
+    // Deduplicate tokens by (chainId, address) before recording count
+    // This ensures the recorded count matches what will actually be inserted
+    const uniqueTokens = Array.from(
+      new Map(
+        tokens.map((token) => [`${token.chainId}-${token.address}`, token])
+      ).values()
+    )
+
+    const duplicateCount = tokens.length - uniqueTokens.length
+    console.log(
+      `[${providerName}] Deduplication check: ${tokens.length} raw tokens → ${uniqueTokens.length} unique tokens (${duplicateCount} duplicates)`
+    )
+    if (duplicateCount > 0) {
+      console.log(
+        `[${providerName}] ⚠️  Found duplicates! Removed ${duplicateCount} duplicate token entries`
+      )
+    }
+
+    // Insert fetch record with accurate post-deduplication count
     const [fetchRecord] = yield* drizzle
       .insert(db.providerFetches)
       .values({
         providerName,
         success: true,
         chainsCount: chains.length,
-        tokensCount: tokens.length,
+        tokensCount: uniqueTokens.length, // Use deduplicated count
       })
       .returning({ id: db.providerFetches.id })
 
@@ -98,8 +116,9 @@ export const storeProviderData = (
     }
 
     // Insert tokens in batches to avoid stack overflow
-    if (tokens.length > 0) {
-      yield* batchInsertTokens(providerName, tokens, fetchId)
+    // Use deduplicated tokens to avoid redundant processing
+    if (uniqueTokens.length > 0) {
+      yield* batchInsertTokens(providerName, uniqueTokens, fetchId)
     }
 
     console.log(`[${providerName}] Successfully stored data in database`)
@@ -107,6 +126,7 @@ export const storeProviderData = (
 
 /**
  * Insert tokens in batches to prevent stack overflow on large datasets
+ * Note: Expects pre-deduplicated tokens (deduplication happens in storeProviderData)
  */
 const batchInsertTokens = (
   providerName: string,
@@ -119,18 +139,10 @@ const batchInsertTokens = (
     for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
       const batch = tokens.slice(i, i + BATCH_SIZE)
 
-      // Deduplicate tokens by (chainId, address) to avoid ON CONFLICT issues
-      // with duplicate tokens in same batch
-      const uniqueTokens = Array.from(
-        new Map(
-          batch.map((token) => [`${token.chainId}-${token.address}`, token])
-        ).values()
-      )
-
       yield* drizzle
         .insert(db.tokens)
         .values(
-          uniqueTokens.map((token) => ({
+          batch.map((token) => ({
             providerName,
             chainId: token.chainId,
             address: token.address,

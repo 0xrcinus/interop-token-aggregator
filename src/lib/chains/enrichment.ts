@@ -19,10 +19,10 @@ export const enrichChains = Effect.gen(function* () {
 
   console.log("[ChainEnrichment] Starting chain enrichment process...")
 
-  // Fetch all chain metadata
+  // Fetch all chain metadata from registry
   const chainMetadata = yield* registry.fetchAll
 
-  // Get all chain IDs currently in our database
+  // Get existing chain IDs to filter what we need to update
   const existingChains = yield* drizzle
     .select({ chainId: db.chains.chainId })
     .from(db.chains)
@@ -33,14 +33,22 @@ export const enrichChains = Effect.gen(function* () {
     `[ChainEnrichment] Found ${existingChainIds.size} chains in database, ${chainMetadata.length} in registry`
   )
 
-  // Update chains with enriched metadata
-  let enrichedCount = 0
-  for (const metadata of chainMetadata) {
-    if (!existingChainIds.has(metadata.chainId)) {
-      continue // Skip chains we don't have
-    }
+  // Filter to only chains we actually have in our database
+  const chainsToUpdate = chainMetadata.filter((metadata) =>
+    existingChainIds.has(metadata.chainId)
+  )
 
-    yield* drizzle
+  if (chainsToUpdate.length === 0) {
+    console.log("[ChainEnrichment] No chains to enrich")
+    return { enrichedCount: 0, totalChains: existingChainIds.size }
+  }
+
+  console.log(`[ChainEnrichment] Will update ${chainsToUpdate.length} chains`)
+
+  // Batch all updates using Effect.all for parallel execution
+  // Note: Neon's Postgres Proxy driver doesn't support transactions, so we use parallel updates
+  const updates = chainsToUpdate.map((metadata) =>
+    drizzle
       .update(db.chains)
       .set({
         name: metadata.name,
@@ -59,13 +67,14 @@ export const enrichChains = Effect.gen(function* () {
         updatedAt: sql`NOW()`,
       })
       .where(sql`${db.chains.chainId} = ${metadata.chainId}`)
+  )
 
-    enrichedCount++
-  }
+  // Execute all updates in parallel with concurrency limit
+  yield* Effect.all(updates, { concurrency: 10 })
 
-  console.log(`[ChainEnrichment] Successfully enriched ${enrichedCount} chains`)
+  console.log(`[ChainEnrichment] Successfully enriched ${chainsToUpdate.length} chains`)
 
-  return { enrichedCount, totalChains: existingChainIds.size }
+  return { enrichedCount: chainsToUpdate.length, totalChains: existingChainIds.size }
 })
 
 /**
