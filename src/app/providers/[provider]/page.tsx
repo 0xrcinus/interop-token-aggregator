@@ -4,11 +4,10 @@ import { Effect } from "effect"
 import { ProviderApiService, ApiServicesLive, type ProviderMetadata } from "@/lib/api"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ProviderTokenList } from "./token-list"
-import { REVALIDATE_INTERVAL } from "@/lib/config"
 
-// Revalidate interval as fallback (in case manual revalidation fails)
-// Configure via NEXT_PUBLIC_REVALIDATE_INTERVAL env variable
-export const revalidate = REVALIDATE_INTERVAL
+// Revalidate every 5 minutes as a fallback (in case manual revalidation fails)
+export const revalidate = 300
+
 
 async function getProviderMetadata(providerName: string): Promise<ProviderMetadata> {
   const program = Effect.gen(function* () {

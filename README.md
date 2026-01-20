@@ -468,10 +468,6 @@ POSTGRES_SSL=false
 
 # Admin API Secret (for POST /api/admin/fetch)
 ADMIN_SECRET=change-this-in-production
-
-# Page revalidation interval in seconds (default: 300 = 5 minutes)
-# Lower values = fresher data but more database load
-NEXT_PUBLIC_REVALIDATE_INTERVAL=300
 ```
 
 **Important**:
@@ -620,29 +616,29 @@ pnpm fetch:providers
 
 ### 2. Time-Based Revalidation (Fallback)
 
-Pages revalidate at a configurable interval (default: 5 minutes) as a safety net:
+Pages revalidate every 5 minutes (300 seconds) as a safety net:
 
-```bash
-# Configure in .env.local
-NEXT_PUBLIC_REVALIDATE_INTERVAL=300  # 5 minutes (default)
+```typescript
+// Hardcoded in each page file
+export const revalidate = 300
 ```
 
 **How it works**:
-- If a page hasn't been regenerated in the specified interval, Next.js automatically regenerates it on the next request
+- If a page hasn't been regenerated in 5 minutes, Next.js automatically regenerates it on the next request
 - User gets the cached version, then the page regenerates in the background
-- Ensures data is never more than the configured interval stale
+- Ensures data is never more than 5 minutes stale
 
-**Recommended values**:
-- `300` (5 min): Development, frequent updates
-- `600` (10 min): Production with moderate traffic
-- `3600` (1 hour): Low-traffic sites, reduce database load
+**To adjust the interval**: Edit the `revalidate` constant in each page file:
+- `300` (5 min): Current default, good for most use cases
+- `600` (10 min): For lower database load
+- `3600` (1 hour): For very low-traffic sites
 
 ### Benefits
 
 ✅ **Fast**: Static pages served from CDN (10-50ms)
 ✅ **Fresh**: Automatic updates when data changes
-✅ **Configurable**: Adjust revalidation interval per environment
-✅ **Flexible**: Adjust interval per page if needed
+✅ **Simple**: No configuration needed, works out of the box
+✅ **Flexible**: Adjust per page if needed
 
 ### Production: Automatic Scheduled Fetches
 

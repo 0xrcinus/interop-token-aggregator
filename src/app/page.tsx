@@ -4,11 +4,10 @@ import { ProviderApiService, ChainApiService, ApiServicesLive } from "@/lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ArrowRight, Server, Network, Coins } from "lucide-react"
-import { REVALIDATE_INTERVAL } from "@/lib/config"
 
-// Revalidate interval as fallback (in case manual revalidation fails)
-// Configure via NEXT_PUBLIC_REVALIDATE_INTERVAL env variable
-export const revalidate = REVALIDATE_INTERVAL
+// Revalidate every 5 minutes as a fallback (in case manual revalidation fails)
+export const revalidate = 300
+
 
 async function getProviders() {
   const program = Effect.gen(function* () {

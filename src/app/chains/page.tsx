@@ -5,11 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ChainIcon } from "@/components/chain-icon"
-import { REVALIDATE_INTERVAL } from "@/lib/config"
 
-// Revalidate interval as fallback (in case manual revalidation fails)
-// Configure via NEXT_PUBLIC_REVALIDATE_INTERVAL env variable
-export const revalidate = REVALIDATE_INTERVAL
+// Revalidate every 5 minutes as a fallback (in case manual revalidation fails)
+export const revalidate = 300
+
 
 async function getChains() {
   const program = Effect.gen(function* () {
