@@ -50,6 +50,7 @@ export class ChainApiService extends Context.Tag("ChainApiService")<
   ChainApiService,
   {
     readonly getChains: Effect.Effect<ChainsResponse, ChainApiError | SqlError>
+    readonly getChainById: (chainId: number) => Effect.Effect<ChainInfo, ChainApiError | SqlError>
   }
 >() {}
 
@@ -120,7 +121,73 @@ const make = Effect.gen(function* () {
     Effect.mapError((error) => new ChainApiError("Failed to fetch chains", error))
   )
 
-  return { getChains }
+  const getChainById = (chainId: number) =>
+    Effect.gen(function* () {
+      const chainList = yield* drizzle
+        .select({
+          chainId: chains.chainId,
+          name: chains.name,
+          shortName: chains.shortName,
+          chainType: chains.chainType,
+          icon: chains.icon,
+          infoUrl: chains.infoUrl,
+          explorers: chains.explorers,
+          nativeCurrencyName: chains.nativeCurrencyName,
+          nativeCurrencySymbol: chains.nativeCurrencySymbol,
+          nativeCurrencyDecimals: chains.nativeCurrencyDecimals,
+          providerCount: sql<number>`COUNT(DISTINCT ${chainProviderSupport.providerName})`,
+          tokenCount: sql<number>`COUNT(DISTINCT ${tokens.id})`,
+          providers: sql<string[]>`ARRAY_AGG(DISTINCT ${chainProviderSupport.providerName})`,
+        })
+        .from(chains)
+        .leftJoin(chainProviderSupport, sql`${chains.chainId} = ${chainProviderSupport.chainId}`)
+        .leftJoin(tokens, sql`${chains.chainId} = ${tokens.chainId}`)
+        .where(sql`${chains.chainId} = ${chainId}`)
+        .groupBy(
+          chains.chainId,
+          chains.name,
+          chains.shortName,
+          chains.chainType,
+          chains.icon,
+          chains.infoUrl,
+          chains.explorers,
+          chains.nativeCurrencyName,
+          chains.nativeCurrencySymbol,
+          chains.nativeCurrencyDecimals
+        )
+
+      if (chainList.length === 0) {
+        return yield* Effect.fail(new ChainApiError(`Chain not found: ${chainId}`))
+      }
+
+      const chain = chainList[0]
+
+      return {
+        chainId: chain.chainId,
+        name: chain.name,
+        shortName: chain.shortName ?? undefined,
+        chainType: chain.chainType ?? undefined,
+        icon: chain.icon ?? undefined,
+        infoUrl: chain.infoUrl ?? undefined,
+        explorers: chain.explorers as any ?? undefined,
+        nativeCurrency: {
+          name: chain.nativeCurrencyName,
+          symbol: chain.nativeCurrencySymbol,
+          decimals: chain.nativeCurrencyDecimals,
+        },
+        providerCount: chain.providerCount,
+        tokenCount: chain.tokenCount,
+        providers: chain.providers,
+      }
+    }).pipe(
+      Effect.mapError((error) =>
+        error instanceof ChainApiError
+          ? error
+          : new ChainApiError("Failed to fetch chain by ID", error)
+      )
+    )
+
+  return { getChains, getChainById }
 })
 
 export const ChainApiServiceLive = Layer.effect(ChainApiService, make)

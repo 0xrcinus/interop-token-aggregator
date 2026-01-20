@@ -15,10 +15,10 @@ import { AdminApiService, AdminApiServiceLive } from "./admin"
  * Export all services and types
  */
 export { ProviderApiService, ChainApiService, TokenApiService, AdminApiService }
-export type { ProvidersResponse } from "./providers"
-export type { ChainsResponse } from "./chains"
+export type { ProvidersResponse, ProviderMetadata } from "./providers"
+export type { ChainsResponse, ChainInfo } from "./chains"
 export type { TokensResponse, TokenDetailResponse } from "./tokens"
-export { TokenListQuery } from "./tokens"
+export { TokenListQuery, TokenNotFoundError } from "./tokens"
 export type { FetchResponse } from "./admin"
 
 /**

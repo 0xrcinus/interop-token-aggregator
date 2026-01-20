@@ -1,54 +1,28 @@
 import Link from "next/link"
+import { Effect } from "effect"
+import { TokenApiService, ApiServicesLive, type TokenDetailResponse, TokenNotFoundError } from "@/lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { SupportMatrix } from "@/components/support-matrix"
 import { AddressDisplay } from "@/components/address-display"
 
-interface TokenInstance {
-  provider: string
-  address: string
-  name: string
-  decimals: number | null
-  logoUri: string | null
-  tags: string[]
-  createdAt: string
-  rawData: Record<string, unknown>
-}
-
-interface ChainDetail {
-  chainId: number
-  chainName: string
-  instances: TokenInstance[]
-}
-
-interface TokenDetailResponse {
-  symbol: string
-  summary: {
-    totalInstances: number
-    providerCount: number
-    chainCount: number
-    uniqueAddresses: number
-    hasConflicts: boolean
-  }
-  providers: string[]
-  chains: ChainDetail[]
-}
-
 async function getTokenDetail(symbol: string): Promise<TokenDetailResponse> {
-  const res = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/api/tokens/${symbol}`,
-    {
-      next: { revalidate: 60 },
-    }
-  )
-  if (!res.ok) {
-    if (res.status === 404) {
+  const program = Effect.gen(function* () {
+    const tokenApi = yield* TokenApiService
+    return yield* tokenApi.getTokenBySymbol(symbol)
+  }).pipe(Effect.provide(ApiServicesLive), Effect.scoped)
+
+  try {
+    return await Effect.runPromise(program)
+  } catch (error) {
+    // Re-throw with appropriate message
+    if (error instanceof TokenNotFoundError) {
       throw new Error("Token not found")
     }
+    console.error(`Failed to fetch token ${symbol}:`, error)
     throw new Error("Failed to fetch token details")
   }
-  return res.json()
 }
 
 export default async function TokenDetailPage({
@@ -179,7 +153,7 @@ export default async function TokenDetailPage({
         </div>
 
         {/* Support Matrix */}
-        <SupportMatrix chains={data.chains} providers={data.providers} />
+        <SupportMatrix chains={data.chains as any} providers={data.providers as any} />
 
         {/* Chain Details */}
         <div className="space-y-6">

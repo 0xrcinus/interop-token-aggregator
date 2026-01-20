@@ -1,53 +1,30 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
+import { Effect } from "effect"
+import { ChainApiService, ApiServicesLive, type ChainInfo } from "@/lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ChainIcon } from "@/components/chain-icon"
 import { ExternalLink } from "lucide-react"
 import { TokenListForChain } from "./token-list"
 
-interface ChainMetadata {
-  chainId: number
-  name: string
-  shortName?: string
-  chainType?: string
-  icon?: string
-  infoUrl?: string
-  explorers?: Array<{
-    name: string
-    url: string
-    standard: string
-  }>
-  nativeCurrency: {
-    name: string
-    symbol: string
-    decimals: number
-  }
-  providers: string[]
-  totalTokens: number
-}
+async function getChainMetadata(chainIdStr: string): Promise<ChainInfo> {
+  const chainId = Number(chainIdStr)
 
-async function getChainMetadata(chainId: string): Promise<ChainMetadata> {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
-  const res = await fetch(`${baseUrl}/api/chains/${chainId}`, {
-    next: { revalidate: 60 },
-  })
-  if (!res.ok) {
-    if (res.status === 404) notFound()
-    throw new Error("Failed to fetch chain details")
+  if (isNaN(chainId)) {
+    notFound()
   }
-  const data = await res.json()
-  return {
-    chainId: data.chainId,
-    name: data.name,
-    shortName: data.shortName,
-    chainType: data.chainType,
-    icon: data.icon,
-    infoUrl: data.infoUrl,
-    explorers: data.explorers,
-    nativeCurrency: data.nativeCurrency,
-    providers: data.providers,
-    totalTokens: data.totalTokens,
+
+  const program = Effect.gen(function* () {
+    const chainApi = yield* ChainApiService
+    return yield* chainApi.getChainById(chainId)
+  }).pipe(Effect.provide(ApiServicesLive), Effect.scoped)
+
+  try {
+    return await Effect.runPromise(program)
+  } catch (error) {
+    console.error(`Failed to fetch chain ${chainId}:`, error)
+    notFound()
   }
 }
 
@@ -138,7 +115,7 @@ export default async function ChainDetailPage({
                 <CardDescription>Block Explorers</CardDescription>
                 <CardContent className="pt-2 px-0">
                   <div className="flex flex-col gap-1">
-                    {data.explorers.slice(0, 2).map((explorer) => (
+                    {data.explorers.slice(0, 2).map((explorer: { name: string; url: string }) => (
                       <a
                         key={explorer.url}
                         href={explorer.url}
@@ -166,7 +143,7 @@ export default async function ChainDetailPage({
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {data.providers.map((provider) => (
+              {data.providers.map((provider: string) => (
                 <Link key={provider} href={`/providers/${provider}`}>
                   <Badge variant="secondary" className="hover:bg-secondary/80 cursor-pointer">
                     {provider}

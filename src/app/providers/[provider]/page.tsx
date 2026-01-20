@@ -1,28 +1,21 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
+import { Effect } from "effect"
+import { ProviderApiService, ApiServicesLive, type ProviderMetadata } from "@/lib/api"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ProviderTokenList } from "./token-list"
 
-interface ProviderMetadata {
-  provider: string
-  totalTokens: number
-  uniqueSymbols: number
-}
+async function getProviderMetadata(providerName: string): Promise<ProviderMetadata> {
+  const program = Effect.gen(function* () {
+    const providerApi = yield* ProviderApiService
+    return yield* providerApi.getProviderMetadata(providerName)
+  }).pipe(Effect.provide(ApiServicesLive), Effect.scoped)
 
-async function getProviderMetadata(provider: string): Promise<ProviderMetadata> {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
-  const res = await fetch(`${baseUrl}/api/providers/${provider}?limit=1`, {
-    next: { revalidate: 60 },
-  })
-  if (!res.ok) {
-    if (res.status === 404) notFound()
-    throw new Error("Failed to fetch provider metadata")
-  }
-  const data = await res.json()
-  return {
-    provider: data.provider,
-    totalTokens: data.totalTokens,
-    uniqueSymbols: data.uniqueSymbols,
+  try {
+    return await Effect.runPromise(program)
+  } catch (error) {
+    console.error(`Failed to fetch provider ${providerName}:`, error)
+    notFound()
   }
 }
 

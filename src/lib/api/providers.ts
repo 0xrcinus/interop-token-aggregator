@@ -6,8 +6,8 @@
 import { Effect, Context, Layer } from "effect"
 import * as Pg from "@effect/sql-drizzle/Pg"
 import { SqlError } from "@effect/sql/SqlError"
-import { providerFetches } from "@/lib/db/schema"
-import { sql } from "drizzle-orm"
+import { providerFetches, tokens } from "@/lib/db/schema"
+import { sql, eq } from "drizzle-orm"
 
 /**
  * Provider summary statistics
@@ -39,6 +39,12 @@ export interface ProvidersResponse {
   }
 }
 
+export interface ProviderMetadata {
+  readonly provider: string
+  readonly totalTokens: number
+  readonly uniqueSymbols: number
+}
+
 /**
  * Custom error types for provider API operations
  */
@@ -57,6 +63,7 @@ export class ProviderApiService extends Context.Tag("ProviderApiService")<
   ProviderApiService,
   {
     readonly getProviders: Effect.Effect<ProvidersResponse, ProviderApiError | SqlError>
+    readonly getProviderMetadata: (provider: string) => Effect.Effect<ProviderMetadata, ProviderApiError | SqlError>
   }
 >() {}
 
@@ -141,7 +148,47 @@ const make = Effect.gen(function* () {
     Effect.mapError((error) => new ProviderApiError("Failed to fetch providers", error))
   )
 
-  return { getProviders }
+  const getProviderMetadata = (provider: string) =>
+    Effect.gen(function* () {
+      // Get total token instances
+      const totalInstancesResult = yield* drizzle
+        .select({
+          count: sql<number>`COUNT(*)`,
+        })
+        .from(tokens)
+        .where(eq(tokens.providerName, provider))
+
+      const totalInstances = totalInstancesResult[0]?.count || 0
+
+      // Get unique symbols count
+      const uniqueSymbolsResult = yield* drizzle
+        .select({
+          count: sql<number>`COUNT(DISTINCT ${tokens.symbol})`,
+        })
+        .from(tokens)
+        .where(eq(tokens.providerName, provider))
+
+      const uniqueSymbols = uniqueSymbolsResult[0]?.count || 0
+
+      // If no tokens found, this might not be a valid provider
+      if (totalInstances === 0 && uniqueSymbols === 0) {
+        return yield* Effect.fail(new ProviderApiError(`Provider not found: ${provider}`))
+      }
+
+      return {
+        provider,
+        totalTokens: totalInstances,
+        uniqueSymbols,
+      }
+    }).pipe(
+      Effect.mapError((error) =>
+        error instanceof ProviderApiError
+          ? error
+          : new ProviderApiError("Failed to fetch provider metadata", error)
+      )
+    )
+
+  return { getProviders, getProviderMetadata }
 })
 
 /**
