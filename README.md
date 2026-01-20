@@ -1,31 +1,43 @@
 # Token Aggregator
 
-A production-grade blockchain token aggregation application that fetches and normalizes token data from 12+ interoperability providers (bridges/protocols), stores it in PostgreSQL with comprehensive metadata enrichment, and exposes it via a modern REST API and web interface.
+**Problem**: Blockchain interoperability providers (bridges, DEX aggregators, cross-chain protocols) each maintain their own token lists. No single provider has complete coverage, and their data often conflicts - the same token symbol may have different addresses, decimals, or metadata across providers.
 
-Built with **Effect-TS** for functional error handling, **Drizzle ORM** for type-safe database access, and **Next.js 16** for the web framework.
+**Solution**: This application aggregates token data from 12 major providers, normalizes it into a unified database, and surfaces coverage gaps and conflicts through a web interface and REST API.
 
----
+## What It Does
 
-## Features
+Fetches token data from 12 interoperability providers and answers questions like:
 
-### Data Aggregation
-- **12 Integrated Providers**: Relay, LiFi, Across, Stargate, DeBridge, Mayan, Rhino.fi, GasZip, Aori, Eco, Meson, Butter
-- **34,000+ Tokens** across **217+ Chains** with automatic deduplication
-- **Non-EVM Chain Support**: Proper handling of Solana (SVM), Bitcoin (BVM), and other non-EVM chains with case-sensitive addresses
-- **Chain Metadata Enrichment**: Automatic enrichment from Chainlist API (logos, explorers, RPC endpoints, chain types)
-- **Token Categorization**: 8 categories (wrapped, stablecoin, liquidity-pool, governance, bridged, yield-bearing, rebasing, native)
+- **Coverage**: Which providers support USDC? On which chains?
+- **Conflicts**: Does "WETH" have different addresses on Ethereum across providers?
+- **Gaps**: Which chains have the most provider support? Which have the least?
+- **Metadata**: Where can I find block explorers, logos, and RPC endpoints for each chain?
 
-### Architecture
-- **Effect-TS 3.x**: Functional effect system with Context/Layer dependency injection pattern
-- **Type Safety**: Full TypeScript with strict mode, zero `any` types, tagged errors throughout
-- **Performance**: Parallel provider execution (~3.2s for all 12 providers), batch inserts (500 records/batch)
-- **Data Integrity**: Optional decimals field (null when provider doesn't supply data), JSONB storage for raw provider data
+### Current Dataset
 
-### API & UI
-- **REST API**: 6 endpoints for tokens, chains, providers, and admin operations
-- **Modern UI**: shadcn/ui components with Tailwind CSS v4, lucide-react icons
-- **Rich Metadata**: Chain logos, explorer links, provider health status, conflict detection
-- **Tag Filtering**: Server-side filtering by token categories with URL-based state management
+- **34,221 tokens** across **217 chains**
+- Data from **12 providers**: Relay, LiFi, Across, Stargate, DeBridge, Mayan, Rhino.fi, GasZip, Aori, Eco, Meson, Butter
+- Tokens categorized into 8 types: wrapped, stablecoin, liquidity-pool, governance, bridged, yield-bearing, rebasing, native
+- Chain metadata enriched from Chainlist API (logos, explorers, RPC endpoints)
+- Both EVM and non-EVM chains (Solana, Bitcoin, etc.) with proper address normalization
+
+### Key Features
+
+- **Conflict Detection**: Identifies when the same token symbol has different addresses or decimals on the same chain across providers
+- **Provider Health Tracking**: Monitors fetch success rates and data freshness for each provider
+- **Multi-Chain Support**: Handles 217+ chains including Ethereum, Arbitrum, Optimism, Polygon, Solana, and more
+- **Fast Updates**: Fetches all 12 providers in parallel (~3.2 seconds), with automatic page revalidation
+
+## Example Use Cases
+
+**Q: Which providers support USDC on Arbitrum?**
+Visit `/tokens/USDC` to see all instances grouped by chain. Find Arbitrum (chain ID 42161) and see which providers list it.
+
+**Q: Are there conflicts for WETH on Ethereum?**
+The token detail page shows when multiple providers report different addresses for the same symbol on the same chain.
+
+**Q: Which chains have the best cross-provider support?**
+Visit `/chains` to see chains sorted by provider count. Ethereum typically has 10+ providers, while niche chains may only have 1-2.
 
 ---
 
@@ -192,74 +204,40 @@ Audit log of all fetch attempts with success/error tracking.
 
 ---
 
-## Architecture Deep Dive
+## How It Works
 
-### Effect-TS Layer Composition
+### Data Collection
 
-The project uses Effect-TS 3.x's Context/Layer pattern for dependency injection. This is **critical** and must not be broken.
+1. **Parallel Fetching**: Queries all 12 provider APIs concurrently (~3.2 seconds total)
+2. **Normalization**: Converts each provider's data format into a unified schema
+3. **Storage**: Saves chains, tokens, and provider relationships to PostgreSQL
+4. **Enrichment**: Fetches chain metadata (logos, explorers) from Chainlist API
+5. **Categorization**: Tags tokens automatically (stablecoin, wrapped, LP, etc.)
 
-**Pattern**: All providers share base dependencies via `Layer.provideMerge`:
+### Address Normalization
 
-```typescript
-// src/lib/providers/index.ts
-const ProvidersBaseLive = Layer.mergeAll(
-  DatabaseLive,              // PostgreSQL + Drizzle
-  NodeHttpClient.layerUndici // HTTP client with retry logic
-)
+Handles both EVM and non-EVM chains correctly:
+- **EVM chains** (Ethereum, Polygon, etc.): Addresses lowercased (`0xabc...`) since they're case-insensitive
+- **Non-EVM chains** (Solana, etc.): Addresses preserve original case since they use case-sensitive encoding (base58)
 
-// Each provider receives dependencies automatically
-const RelayLive = RelayProviderLive.pipe(Layer.provideMerge(ProvidersBaseLive))
+### Chain ID Mapping
 
-// Final composed layer with all 12 providers
-export const AllProvidersLive = Layer.mergeAll(
-  RelayLive, LifiLive, AcrossLive, StargateLive, DebridgeLive,
-  MayanLive, RhinoLive, GasZipLive, AoriLive, EcoLive, MesonLive, ButterLive
-)
-```
+Some providers use different IDs for the same chain. For example, Solana:
+- Relay uses: `792703809`
+- GasZip uses: `501474`
+- Across uses: `34268394551451`
 
-**Why `Layer.provideMerge` matters**: Using `Layer.provide` instead will cause "Service not found: @effect/platform/HttpClient" errors. `provideMerge` properly resolves nested dependencies.
+The system normalizes these to a canonical ID (Across's `34268394551451`) so tokens from all providers appear under one unified Solana chain.
 
-### Tagged Errors
+### Conflict Detection
 
-All errors extend `Data.TaggedError` for type safety (required by Effect language service):
+The application identifies conflicts when:
+- Same token symbol has different addresses on the same chain across providers
+- Same token symbol has different decimal values on the same chain
 
-```typescript
-export class ProviderError extends Data.TaggedError("ProviderError")<{
-  readonly provider: string
-  readonly message: string
-  readonly cause?: unknown
-}> {}
-```
+**Current status**: Conflicts are detected and surfaced in the UI, but not automatically resolved. The application shows all conflicting instances and lets users decide which provider's data to trust.
 
-### Address Normalization (Chain-Aware)
-
-**Critical for Non-EVM Chains**: Solana addresses are case-sensitive (base58), EVM addresses are case-insensitive (hex).
-
-```typescript
-import { normalizeAddress } from "@/lib/aggregation/normalize"
-import { isEvmChain } from "@/lib/aggregation/chain-mapping"
-
-const isEvm = isEvmChain(chainId)
-const address = normalizeAddress(token.address, isEvm)
-
-// EVM: 0xABC... → 0xabc... (lowercase)
-// Solana: 2zMMh... → 2zMMh... (preserved case)
-```
-
-### Chain ID Normalization
-
-Non-EVM chains like Solana have different IDs across providers. The system normalizes them to canonical IDs:
-
-```typescript
-// src/lib/aggregation/chain-mapping.ts
-export const CHAIN_ID_MAPPINGS: Record<string, Record<number, number>> = {
-  "relay": { 792703809: 34268394551451 },      // Relay's Solana → Across's Solana
-  "gaszip": { 501474: 34268394551451 },        // GasZip's Solana → Across's Solana
-  "butter": { 1360108768460801: 34268394551451 } // Butter's Solana → Across's Solana
-}
-```
-
-**Result**: Single unified Solana chain (ID: 34268394551451) with tokens from 3 providers.
+**Example conflict**: If Provider A says USDC on Ethereum is `0xabc...` and Provider B says it's `0xdef...`, both are shown with a conflict warning.
 
 ---
 
@@ -485,26 +463,26 @@ ADMIN_SECRET=change-this-in-production
 
 ---
 
-## Provider Implementations
+## Provider Coverage
 
-### Implemented Providers (12)
+This shows how much data each provider contributes to the aggregated dataset:
 
-| Provider | Tokens | Chains | Notes |
-|----------|--------|--------|-------|
-| **DeBridge** | 16,712 | 24 | Largest token count, per-chain fetching |
-| **LiFi** | 12,692 | 58 | Null byte sanitization required |
-| **Stargate** | 2,157 | 96 | chainKey → chainId mapping |
-| **Across** | 1,333 | 23 | Parallel endpoint fetching |
-| **Mayan** | 468 | 7 | Wormhole chain ID mapping |
-| **Butter** | 200 | 14 | Paginated API with concurrency control |
-| **Relay** | 166 | 80 | EVM + non-EVM chains, vmType detection |
-| **GasZip** | 161 | 161 | Native tokens only, mainnet filtering |
-| **Meson** | 138 | 72 | Hex and decimal chain ID parsing |
-| **Aori** | 92 | 8 | Minimal metadata, no decimals |
-| **Rhino.fi** | 78 | 31 | Nested token structure |
-| **Eco** | 24 | 10 | Static hardcoded data |
+| Provider | Tokens | Chains | Notable Coverage |
+|----------|--------|--------|------------------|
+| **DeBridge** | 16,712 | 24 | Largest token catalog, strong Ethereum/BSC support |
+| **LiFi** | 12,692 | 58 | Widest chain coverage, excellent for multi-chain tokens |
+| **Stargate** | 2,157 | 96 | Most chains supported, focused on LayerZero ecosystem |
+| **Across** | 1,333 | 23 | Optimistic rollups (Optimism, Arbitrum, Base) |
+| **Mayan** | 468 | 7 | Solana-focused bridge with SVM/EVM pairs |
+| **Butter** | 200 | 14 | Curated token list for major chains |
+| **Relay** | 166 | 80 | Both EVM and non-EVM chains |
+| **GasZip** | 161 | 161 | Native gas tokens only (one per chain) |
+| **Meson** | 138 | 72 | Stablecoin-focused |
+| **Aori** | 92 | 8 | Minimal metadata |
+| **Rhino.fi** | 78 | 31 | Layer 2 focused |
+| **Eco** | 24 | 10 | Small curated set |
 
-**Total**: 34,221 tokens across 217 chains (fetch time: ~3.2s)
+**Total**: 34,221 tokens across 217 chains (fetched in ~3.2 seconds)
 
 **For complete API endpoints and implementation details**, see [PLAN.md](PLAN.md#provider-api-endpoints--implementation-details) which includes:
 - Exact API URLs for all 12 providers
@@ -542,25 +520,44 @@ ADMIN_SECRET=change-this-in-production
 
 ---
 
-## Key Technical Decisions
+## Technical Architecture
 
-### 1. Bigint Chain IDs
-Some chains have IDs > 2 billion (e.g., Across's Solana: 34268394551451). The database uses `bigint` instead of `integer`.
+### Technology Stack
 
-### 2. Optional Decimals Field
-When providers don't supply decimals data, we store `null` instead of defaulting to 18. This maintains data integrity and makes missing data transparent.
+- **Next.js 16**: Web framework with App Router for API routes and UI
+- **PostgreSQL 16**: Database with JSONB support for flexible metadata storage
+- **Drizzle ORM**: Type-safe database access with migration support
+- **Effect-TS**: Functional programming framework for error handling and dependency injection
 
-### 3. JSONB Raw Data Storage
-All tokens store the original provider response in `raw_data` JSONB field. This enables debugging provider discrepancies without refetching.
+### Key Technical Decisions
 
-### 4. Batch Inserts with Deduplication
-Inserts are batched (500 records/batch) with within-batch deduplication to prevent "ON CONFLICT DO UPDATE" errors from duplicate data.
+**1. Preserve Raw Provider Data**
+All tokens store the original provider response in a `raw_data` JSONB field. This enables debugging provider discrepancies without refetching from APIs.
 
-### 5. Chain-Aware Address Normalization
-EVM addresses are lowercased, non-EVM addresses (Solana, etc.) preserve case. This prevents breaking block explorer links for case-sensitive encodings.
+**2. Null for Missing Data**
+When providers don't supply decimals, we store `null` instead of defaulting to 18. This makes missing data transparent rather than hiding it with assumptions.
 
-### 6. VM Type Storage
-Instead of manual chain ID mapping, the system stores `vm_type` from provider data (Relay's `vmType`, Stargate's `chainType`). This makes the system extensible to new VM types.
+**3. Bigint for Chain IDs**
+Some chains have IDs > 2 billion (e.g., Across's Solana: 34268394551451). The database uses `bigint` instead of `integer` to handle these.
+
+**4. Chain-Aware Address Handling**
+EVM addresses are lowercased for consistency, but non-EVM addresses (Solana, etc.) preserve their original case to prevent breaking block explorer links.
+
+**5. VM Type Storage**
+Instead of hardcoding chain types, the system stores `vm_type` from provider data (evm, svm, bvm, etc.). This makes it extensible to new VM types without code changes.
+
+**6. Batch Inserts for Performance**
+Large token lists are inserted in batches of 500 records to prevent stack overflow and improve database performance.
+
+### Effect-TS Architecture
+
+The application uses Effect-TS for functional error handling and dependency injection. Key patterns:
+
+- **Layer Composition**: Providers share database and HTTP client dependencies via `Layer.provideMerge`
+- **Tagged Errors**: All errors extend `Data.TaggedError` for type-safe error handling
+- **Parallel Execution**: All 12 providers fetch concurrently using `Effect.all` with unbounded concurrency
+
+See [CLAUDE.md](CLAUDE.md) for detailed architectural patterns and implementation guidelines.
 
 ---
 

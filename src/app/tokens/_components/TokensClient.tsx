@@ -152,10 +152,10 @@ export function TokensClient() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Symbol</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Tags</TableHead>
+                      <TableHead className="hidden md:table-cell">Name</TableHead>
+                      <TableHead className="hidden md:table-cell">Tags</TableHead>
                       <TableHead>Providers</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead className="hidden sm:table-cell">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -166,12 +166,12 @@ export function TokensClient() {
                             {token.symbol}
                           </Link>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden md:table-cell">
                           <Link href={`/tokens/${encodeURIComponent(token.symbol)}`} className="hover:text-primary">
                             {token.name}
                           </Link>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden md:table-cell">
                           <div className="flex gap-1 flex-wrap max-w-xs">
                             {token.tags && token.tags.length > 0 ? (
                               token.tags.map((tag) => (
@@ -189,7 +189,7 @@ export function TokensClient() {
                             {token.providerCount} {token.providerCount === 1 ? "provider" : "providers"}
                           </Badge>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden sm:table-cell">
                           <Link
                             href={`/tokens/${encodeURIComponent(token.symbol)}`}
                             className="text-sm text-primary hover:underline"
