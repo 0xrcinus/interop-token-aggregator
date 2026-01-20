@@ -8,6 +8,8 @@ This is a token aggregation application that fetches blockchain token data from 
 
 **Current Status**: Phase 9 complete (All 12 Providers Operational). Successfully integrated with Neon cloud database. Implements all 12 providers (Relay, LiFi, Across, Stargate, DeBridge, Mayan, Rhino.fi, GasZip, Aori, Eco, Meson, Butter) with 34,221+ tokens across 217+ chains stored in PostgreSQL.
 
+**Data Freshness**: Implements Next.js ISR with two-tier revalidation (on-demand + 5-minute fallback). Pages automatically update when data changes. See "Data Freshness & Revalidation" section in README.md for details.
+
 ## Commands
 
 ### Development

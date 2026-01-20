@@ -468,6 +468,10 @@ POSTGRES_SSL=false
 
 # Admin API Secret (for POST /api/admin/fetch)
 ADMIN_SECRET=change-this-in-production
+
+# Page revalidation interval in seconds (default: 300 = 5 minutes)
+# Lower values = fresher data but more database load
+NEXT_PUBLIC_REVALIDATE_INTERVAL=300
 ```
 
 **Important**:
@@ -590,6 +594,84 @@ Automatic tag assignment using pattern-based detection:
 
 ---
 
+## Data Freshness & Revalidation
+
+The application uses **Next.js Incremental Static Regeneration (ISR)** with a two-tier revalidation strategy to keep pages fresh:
+
+### 1. On-Demand Revalidation (Primary)
+
+When you trigger `POST /api/admin/fetch`, all static pages automatically revalidate:
+
+```bash
+# Fetch new data and trigger revalidation
+curl -X POST http://localhost:3000/api/admin/fetch \
+  -H "x-admin-secret: your-secret-here"
+
+# Or use the CLI (doesn't trigger revalidation automatically)
+pnpm fetch:providers
+```
+
+**How it works**:
+- After successful data fetch, the API calls `revalidatePath()` for all key routes
+- Next request to those pages regenerates them with fresh database data
+- Ensures UI reflects newly fetched data immediately
+
+**Implementation**: See [src/app/api/admin/fetch/route.ts](src/app/api/admin/fetch/route.ts#L52-L57)
+
+### 2. Time-Based Revalidation (Fallback)
+
+Pages revalidate at a configurable interval (default: 5 minutes) as a safety net:
+
+```bash
+# Configure in .env.local
+NEXT_PUBLIC_REVALIDATE_INTERVAL=300  # 5 minutes (default)
+```
+
+**How it works**:
+- If a page hasn't been regenerated in the specified interval, Next.js automatically regenerates it on the next request
+- User gets the cached version, then the page regenerates in the background
+- Ensures data is never more than the configured interval stale
+
+**Recommended values**:
+- `300` (5 min): Development, frequent updates
+- `600` (10 min): Production with moderate traffic
+- `3600` (1 hour): Low-traffic sites, reduce database load
+
+### Benefits
+
+✅ **Fast**: Static pages served from CDN (10-50ms)
+✅ **Fresh**: Automatic updates when data changes
+✅ **Configurable**: Adjust revalidation interval per environment
+✅ **Flexible**: Adjust interval per page if needed
+
+### Production: Automatic Scheduled Fetches
+
+For automatic scheduled fetches in production, add to `vercel.json`:
+
+```json
+{
+  "crons": [{
+    "path": "/api/admin/fetch",
+    "schedule": "0 */6 * * *"
+  }]
+}
+```
+
+This triggers a fetch every 6 hours and automatically revalidates all pages.
+
+### Alternative: Dynamic Rendering
+
+If you need always-fresh data at the cost of slower page loads:
+
+```typescript
+// Add to any page for real-time data
+export const dynamic = 'force-dynamic'
+```
+
+**Trade-off**: Query database on every request (~500-2000ms) vs. serve static HTML (~10-50ms)
+
+---
+
 ## Known Limitations
 
 1. **No Materialized Views**: Currently using standard SQL queries, not optimized with materialized views for frequently computed aggregations.
@@ -598,7 +680,7 @@ Automatic tag assignment using pattern-based detection:
 
 3. **No Staleness Deletion**: Old tokens not yet pruned. Need to implement `updated_at` tracking and cleanup logic.
 
-4. **No Scheduled Jobs**: Manual trigger only via API. Vercel Cron or similar not yet configured.
+4. **No Scheduled Jobs**: Manual trigger only. See "Production: Automatic Scheduled Fetches" section above for Vercel Cron setup.
 
 5. **Limited Non-EVM Support**: Only Solana properly consolidated. Other non-EVM chains (Starknet, Bitcoin, Cosmos, etc.) need mapping additions.
 

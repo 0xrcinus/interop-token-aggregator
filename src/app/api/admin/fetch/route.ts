@@ -1,6 +1,7 @@
 import { Effect } from "effect"
 import { AdminApiService, AdminApiServicesLive } from "@/lib/api"
 import { NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 
 /**
  * POST /api/admin/fetch
@@ -11,6 +12,7 @@ import { NextResponse } from "next/server"
  * 1. Validate authentication
  * 2. Use AdminApiService to trigger fetch
  * 3. Run Effect program and return results
+ * 4. Revalidate static pages to reflect new data
  */
 export async function POST(request: Request) {
   // Check authentication
@@ -46,6 +48,15 @@ export async function POST(request: Request) {
   if ("_tag" in result && result._tag === "error") {
     return NextResponse.json({ error: result.message }, { status: 500 })
   }
+
+  // Revalidate all static pages that depend on token/chain/provider data
+  // This ensures the UI reflects the newly fetched data
+  console.log("[API /admin/fetch] Revalidating static pages...")
+  revalidatePath("/", "layout") // Revalidate home page and all nested routes
+  revalidatePath("/chains")
+  revalidatePath("/providers")
+  revalidatePath("/tokens")
+  console.log("[API /admin/fetch] Revalidation complete")
 
   return NextResponse.json(result)
 }
