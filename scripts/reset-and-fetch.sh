@@ -1,11 +1,11 @@
 #!/bin/bash
 set -e
 
-# Load environment variables
-export $(grep -v '^#' .env.local | xargs)
+# Load environment variables from .env.local
+source <(grep -v '^#' .env.local | sed 's/^/export /')
 
 echo "🗑️  Cleaning database..."
-PGPASSWORD=$DATABASE_PASSWORD psql -h $DATABASE_HOST -p $DATABASE_PORT -U $DATABASE_USER -d $DATABASE_NAME << EOF
+PGPASSWORD=$POSTGRES_PASSWORD psql -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DATABASE << EOF
 TRUNCATE TABLE tokens, chain_provider_support, provider_fetches, chains RESTART IDENTITY CASCADE;
 EOF
 

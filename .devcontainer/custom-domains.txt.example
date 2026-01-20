@@ -1,0 +1,10 @@
+# Custom domains to allow through the devcontainer firewall
+# Copy this file to custom-domains.txt and add your domains
+# Add one domain per line (comments starting with # are ignored)
+
+# Example: Neon database
+# your-project.neon.tech
+
+# Example: Other custom APIs
+# api.example.com
+# another-service.io

@@ -41,3 +41,6 @@ next-env.d.ts
 
 # Drizzle
 /migrations
+
+# Custom firewall domains (contains private hostnames)
+.devcontainer/custom-domains.txt

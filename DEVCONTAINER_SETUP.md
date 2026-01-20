@@ -275,11 +275,12 @@ psql -h localhost -p 5433 -U dev -d tokendb -c "SELECT provider_name, COUNT(*) F
 Ensure `.env.local` exists with the following:
 
 ```env
-DATABASE_HOST=localhost
-DATABASE_PORT=5433
-DATABASE_NAME=tokendb
-DATABASE_USER=dev
-DATABASE_PASSWORD=dev
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5433
+POSTGRES_DATABASE=tokendb
+POSTGRES_USER=dev
+POSTGRES_PASSWORD=dev
+POSTGRES_SSL=false
 ADMIN_SECRET=dev-secret-token
 ```
 
@@ -305,3 +306,71 @@ Template available in `.env.example`.
 
 **Last Updated**: 2026-01-20
 **Status**: All 12 providers operational, native PostgreSQL running
+
+---
+
+## Adding Custom Domains to Firewall
+
+The devcontainer firewall can be extended to allow additional domains without modifying the firewall script.
+
+### Use Cases
+- **Database connections** (Neon, Supabase, Railway, PlanetScale)
+- **Additional APIs** not in the default provider list
+- **Internal services** or custom endpoints
+
+### How to Add Domains
+
+**Step 1**: Create custom domains file
+
+```bash
+# Copy the example file
+cp .devcontainer/custom-domains.txt.example .devcontainer/custom-domains.txt
+```
+
+**Step 2**: Edit the file and add your domains (one per line)
+
+```txt
+# .devcontainer/custom-domains.txt
+
+# Neon database
+ep-super-paper-ah48h27x-pooler.c-3.us-east-1.aws.neon.tech
+
+# Other custom APIs
+# api.example.com
+# another-service.io
+```
+
+**Step 3**: Rebuild the devcontainer
+
+The firewall script will automatically read this file on startup and add all domains to the whitelist.
+
+### How It Works
+
+The firewall script ([.devcontainer/init-firewall.sh](.devcontainer/init-firewall.sh)) reads `.devcontainer/custom-domains.txt` during initialization:
+
+1. Reads each line from the file
+2. Skips comments (lines starting with `#`) and empty lines
+3. Resolves each domain to IP addresses
+4. Adds the IPs to the firewall whitelist
+5. Failed resolutions print warnings but don't block startup
+
+### File Location
+
+- **Example file**: [.devcontainer/custom-domains.txt.example](.devcontainer/custom-domains.txt.example) (committed to repo)
+- **Your file**: `.devcontainer/custom-domains.txt` (gitignored, not committed)
+
+This keeps your private hostnames out of the repository.
+
+### Example: Adding Neon Database
+
+```txt
+# .devcontainer/custom-domains.txt
+ep-super-paper-ah48h27x-pooler.c-3.us-east-1.aws.neon.tech
+```
+
+After rebuild, the firewall will:
+1. Resolve the Neon domain to its current IP(s)
+2. Add those IPs to the whitelist
+3. Allow connections to your Neon database
+
+**Note**: The firewall is only active in the devcontainer for security isolation. It does not affect production deployments.

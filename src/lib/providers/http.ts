@@ -11,6 +11,7 @@ export const fetchJson = (url: string) =>
 
     const response = yield* client.get(url).pipe(
       Effect.flatMap((res) => res.json),
+      Effect.timeout("30 seconds"),
       Effect.mapError((error) => new Error(`Failed to fetch ${url}: ${String(error)}`))
     )
 

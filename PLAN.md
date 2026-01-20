@@ -610,11 +610,11 @@ export async function GET(request: Request) {
 
 ```env
 # Database Configuration (PostgreSQL on port 5433)
-DATABASE_HOST=localhost
-DATABASE_PORT=5433
-DATABASE_NAME=tokendb
-DATABASE_USER=dev
-DATABASE_PASSWORD=dev
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5433
+POSTGRES_DATABASE=tokendb
+POSTGRES_USER=dev
+POSTGRES_PASSWORD=dev
 
 # Optional: Full connection string (overrides individual vars)
 DATABASE_URL=postgresql://dev:dev@localhost:5433/tokendb

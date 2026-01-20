@@ -104,6 +104,36 @@ for domain in \
     done < <(echo "$ips")
 done
 
+# Add custom domains from file (if it exists)
+CUSTOM_DOMAINS_FILE="/workspace/.devcontainer/custom-domains.txt"
+if [ -f "$CUSTOM_DOMAINS_FILE" ]; then
+    echo ""
+    echo "Loading custom domains from custom-domains.txt..."
+    while IFS= read -r domain || [ -n "$domain" ]; do
+        # Skip empty lines and comments
+        [[ -z "$domain" || "$domain" =~ ^[[:space:]]*# ]] && continue
+        # Trim whitespace
+        domain=$(echo "$domain" | xargs)
+        if [ -n "$domain" ]; then
+            echo "Resolving $domain..."
+            ips=$(dig +noall +answer A "$domain" | awk '$4 == "A" {print $5}')
+            if [ -z "$ips" ]; then
+                echo "WARNING: Failed to resolve $domain (skipping)"
+                continue
+            fi
+
+            while read -r ip; do
+                if [[ ! "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+                    echo "WARNING: Invalid IP from DNS for $domain: $ip (skipping)"
+                    continue
+                fi
+                echo "Adding $ip for $domain"
+                ipset add allowed-domains "$ip"
+            done < <(echo "$ips")
+        fi
+    done < "$CUSTOM_DOMAINS_FILE"
+fi
+
 # Get host IP from default route
 HOST_IP=$(ip route | grep default | cut -d" " -f3)
 if [ -z "$HOST_IP" ]; then

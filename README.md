@@ -63,9 +63,16 @@ pnpm dev
 - ✅ Database schema creation
 - ✅ Firewall configuration for all provider APIs
 
-**Note**: Database data is not persisted across container restarts (by design for fresh testing). Just run `pnpm fetch:providers` again after restart (~3-5 seconds).
+**Firewall Customization**:
+The devcontainer includes a security firewall that only allows whitelisted domains. To add custom domains (like Neon database):
 
-See [DEVCONTAINER_SETUP.md](DEVCONTAINER_SETUP.md) for details.
+1. Copy `.devcontainer/custom-domains.txt.example` to `.devcontainer/custom-domains.txt`
+2. Add your domain (one per line)
+3. Rebuild the devcontainer
+
+See [DEVCONTAINER_SETUP.md](DEVCONTAINER_SETUP.md#adding-custom-domains-to-firewall) for details.
+
+**Note**: Database data is not persisted across container restarts (by design for fresh testing). Just run `pnpm fetch:providers` again after restart (~3-5 seconds).
 
 ---
 
@@ -436,24 +443,45 @@ SELECT * FROM provider_fetches ORDER BY fetched_at DESC LIMIT 5;
 
 ## Environment Variables
 
-Create `.env.local` with the following variables:
+Create `.env.local` with the following variables (using Neon-compatible naming):
 
 ```env
-# Database Configuration (PostgreSQL on port 5433)
-DATABASE_HOST=localhost
-DATABASE_PORT=5433
-DATABASE_NAME=tokendb
-DATABASE_USER=dev
-DATABASE_PASSWORD=dev
+# PostgreSQL Configuration (Neon-compatible variable names)
+# For local Docker development:
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5433
+POSTGRES_DATABASE=tokendb
+POSTGRES_USER=dev
+POSTGRES_PASSWORD=dev
+POSTGRES_SSL=false
 
-# Optional: Full connection string (overrides individual vars)
+# For Neon production, copy these from your Neon dashboard:
+# POSTGRES_HOST=<your-project>.aws.neon.tech
+# POSTGRES_PORT=5432
+# POSTGRES_USER=<your-username>
+# POSTGRES_DATABASE=<your-database>
+# POSTGRES_PASSWORD=<your-password>
+# POSTGRES_SSL=true
+
+# Alternative: Use DATABASE_URL connection string
 # DATABASE_URL=postgresql://dev:dev@localhost:5433/tokendb
 
 # Admin API Secret (for POST /api/admin/fetch)
 ADMIN_SECRET=change-this-in-production
 ```
 
-**Important**: The database runs on **port 5433** (not the default 5432) to avoid conflicts with local PostgreSQL installations.
+**Important**:
+- **Local development**: Database runs on **port 5433** with SSL disabled to avoid conflicts with local PostgreSQL installations
+- **Neon production**: Database runs on **port 5432** with SSL enabled (required for cloud connections)
+- Environment variable names use `POSTGRES_*` prefix to match Neon's standard naming, making production deployment seamless
+- When deploying to Neon, you can copy the environment variables directly from your Neon dashboard
+- Set `POSTGRES_SSL=true` for Neon or any cloud PostgreSQL database
+
+**DevContainer Firewall**:
+- The devcontainer uses a security firewall that only allows whitelisted domains
+- To connect to external databases (Neon, Supabase, etc.) or custom APIs, edit `.devcontainer/custom-domains.txt`
+- Add one domain per line, then rebuild the container
+- See [DEVCONTAINER_SETUP.md](DEVCONTAINER_SETUP.md#adding-custom-domains-to-firewall) for full documentation
 
 ---
 

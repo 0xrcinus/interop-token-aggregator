@@ -8,6 +8,8 @@
  * For non-EVM chains (Solana, Starknet, Bitcoin, etc.), providers use custom IDs.
  */
 
+import { hasCanonicalMetadata, getCanonicalMetadata } from "../chains/canonical-metadata"
+
 export const CHAIN_ID_NORMALIZATION: Record<number, number> = {
   // Solana mainnet (canonical: 34268394551451 - Across's ID, has most tokens)
   501474: 34268394551451,               // GasZip -> Across
@@ -58,7 +60,6 @@ export function isEvmChain(chainId: number): boolean {
   const canonicalId = normalizeChainId(chainId)
 
   // Check canonical metadata for known non-EVM chains
-  const { hasCanonicalMetadata, getCanonicalMetadata } = require("../chains/canonical-metadata")
   if (hasCanonicalMetadata(canonicalId)) {
     const canonical = getCanonicalMetadata(canonicalId)
     return canonical.vmType === "evm"

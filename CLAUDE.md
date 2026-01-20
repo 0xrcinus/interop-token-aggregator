@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a token aggregation application that fetches blockchain token data from multiple interoperability providers (bridges/protocols) and stores it in PostgreSQL. The project uses **Effect-TS** for functional programming patterns and error handling, **Drizzle ORM** for type-safe database access, and **Next.js 16** for the web framework.
 
-**Current Status**: Phase 5 complete (Job Runner operational). Currently implements 3 providers (Relay, LiFi, Across) with 15,567+ tokens across 73+ chains stored in PostgreSQL.
+**Current Status**: Phase 9 complete (All 12 Providers Operational). Successfully integrated with Neon cloud database. Implements all 12 providers (Relay, LiFi, Across, Stargate, DeBridge, Mayan, Rhino.fi, GasZip, Aori, Eco, Meson, Butter) with 34,221+ tokens across 217+ chains stored in PostgreSQL.
 
 ## Commands
 
@@ -191,17 +191,59 @@ export const chains = pgTable("chains", {
 
 ### Environment Configuration
 
-Database runs on **port 5433** (not the default 5432) to avoid conflicts with local PostgreSQL installations.
+**Local Development**: Database runs on **port 5433** (not the default 5432) to avoid conflicts with local PostgreSQL installations.
 
-`.env.local` structure:
+**Cloud (Neon)**: Uses port 5432 with SSL enabled.
+
+`.env.local` structure (using Neon-compatible variable names):
 ```env
-DATABASE_HOST=localhost
-DATABASE_PORT=5433
-DATABASE_NAME=tokendb
-DATABASE_USER=dev
-DATABASE_PASSWORD=dev
+# Local Docker development:
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5433
+POSTGRES_DATABASE=tokendb
+POSTGRES_USER=dev
+POSTGRES_PASSWORD=dev
+POSTGRES_SSL=false
 ADMIN_SECRET=change-this-in-production
+
+# OR for Neon production:
+# POSTGRES_HOST=ep-your-project.aws.neon.tech
+# POSTGRES_PORT=5432
+# POSTGRES_DATABASE=neondb
+# POSTGRES_USER=neondb_owner
+# POSTGRES_PASSWORD=<from-neon-dashboard>
+# POSTGRES_SSL=true
+# DATABASE_URL=postgresql://user:pass@host/db?sslmode=require
 ```
+
+**Important**:
+- Variable names use `POSTGRES_*` prefix to match Neon's naming convention. This ensures seamless deployment to Neon production - you can copy environment variables directly from the Neon dashboard without renaming them.
+- The Effect SQL layer uses `POSTGRES_SSL` environment variable (defaults to `false` for local, set to `true` for Neon/cloud databases) in [src/lib/db/layer.ts](src/lib/db/layer.ts).
+
+### DevContainer Firewall
+
+The devcontainer includes a security firewall that restricts outbound connections to whitelisted domains only. This prevents accidental data exfiltration and ensures reproducible builds.
+
+**Adding Custom Domains**:
+
+If you need to connect to external services (like Neon database, additional APIs), add them to the custom domains file:
+
+1. Copy the example: `cp .devcontainer/custom-domains.txt.example .devcontainer/custom-domains.txt`
+2. Add your domains (one per line):
+   ```txt
+   # .devcontainer/custom-domains.txt
+   ep-super-paper-ah48h27x-pooler.c-3.us-east-1.aws.neon.tech
+   api.custom.com
+   ```
+3. Rebuild the devcontainer
+
+The firewall script ([.devcontainer/init-firewall.sh](.devcontainer/init-firewall.sh)) reads this file on startup:
+- Resolves each domain to IP addresses
+- Adds IPs to the firewall whitelist
+- Failed resolutions print warnings but don't block startup
+- The file is gitignored to keep private hostnames out of the repo
+
+**Note**: See [DEVCONTAINER_SETUP.md](DEVCONTAINER_SETUP.md#adding-custom-domains-to-firewall) for full documentation.
 
 ### TypeScript Configuration Requirements
 
@@ -331,7 +373,7 @@ The job runner fetches data from all configured providers in parallel:
 pnpm fetch:providers
 ```
 
-**Current Output**: Fetches from 3 providers (Relay, LiFi, Across) in ~1.1 seconds, stores 15,567+ tokens across 73+ chains.
+**Current Output**: Fetches from all 12 providers in ~3-5 seconds, stores 34,221+ tokens across 217+ chains.
 
 **How it works**: [src/jobs/fetch-providers.ts](src/jobs/fetch-providers.ts)
 - Uses `Effect.all` with `concurrency: "unbounded"` for parallel execution
@@ -441,10 +483,12 @@ export async function GET(
 ## Important Reminders
 
 1. **Never break the layer composition pattern** - The `Layer.provideMerge` setup is critical for HttpClient resolution
-2. **Database is on port 5433**, not 5432
+2. **Database ports**: Local Docker uses 5433, Neon uses 5432
 3. **Always batch large inserts** (>1000 records) with 500 per batch
 4. **Sanitize LiFi data** for null bytes before database insertion
 5. **Use bigint for chain IDs** - some exceed 2 billion
 6. **Always use tagged errors** - Effect language service enforces this
 7. **Submodules are read-only** - For reference patterns only
 8. **TypeScript requires `downlevelIteration: true`** - Effect won't compile without it
+9. **SSL for cloud databases** - Set `POSTGRES_SSL=true` for Neon/cloud databases, `false` for local development
+10. **HTTP timeout** - All provider HTTP requests have a 30-second timeout to prevent indefinite hangs
