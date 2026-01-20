@@ -53,6 +53,9 @@ export const enrichChains = Effect.gen(function* () {
         faucets: metadata.faucets as any,
         ens: metadata.ens as any,
         features: metadata.features as any,
+        nativeCurrencyName: metadata.nativeCurrency.name,
+        nativeCurrencySymbol: metadata.nativeCurrency.symbol,
+        nativeCurrencyDecimals: metadata.nativeCurrency.decimals,
         updatedAt: sql`NOW()`,
       })
       .where(sql`${db.chains.chainId} = ${metadata.chainId}`)

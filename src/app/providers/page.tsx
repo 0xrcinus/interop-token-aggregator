@@ -1,17 +1,18 @@
 import Link from "next/link"
-import { ProvidersResponse } from "@/lib/api"
+import { Effect } from "effect"
+import { ProviderApiService, ApiServicesLive } from "@/lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { CheckCircle2, XCircle, ArrowRight } from "lucide-react"
 
-async function getProviders(): Promise<ProvidersResponse> {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
-  const res = await fetch(`${baseUrl}/api/providers`, {
-    next: { revalidate: 60 },
-  })
-  if (!res.ok) throw new Error("Failed to fetch providers")
-  return res.json()
+async function getProviders() {
+  const program = Effect.gen(function* () {
+    const providerApi = yield* ProviderApiService
+    return yield* providerApi.getProviders
+  }).pipe(Effect.provide(ApiServicesLive), Effect.scoped)
+
+  return await Effect.runPromise(program)
 }
 
 export default async function ProvidersPage() {

@@ -38,19 +38,21 @@ export const storeProviderData = (
     const fetchId = fetchRecord.id
 
     // Upsert chains with canonical metadata when available
+    // Provider data is stored first, then enriched with chainlist.network metadata
+    // via the enrichChains() function after all providers complete
     if (chains.length > 0) {
       yield* drizzle
         .insert(db.chains)
         .values(
           chains.map((chain) => {
+            // Check canonical metadata (manually curated for non-EVM chains like Solana)
             const canonical = getCanonicalMetadata(chain.id)
             if (canonical) {
-              // Use canonical metadata for authoritative chains
               return {
                 chainId: canonical.chainId,
                 name: canonical.name,
                 shortName: canonical.shortName,
-                vmType: canonical.vmType, // VM type from canonical metadata
+                vmType: canonical.vmType,
                 nativeCurrencyName: canonical.nativeCurrency.name,
                 nativeCurrencySymbol: canonical.nativeCurrency.symbol,
                 nativeCurrencyDecimals: canonical.nativeCurrency.decimals,
@@ -61,11 +63,12 @@ export const storeProviderData = (
                 rpc: canonical.rpc,
               }
             }
-            // Use provider data for other chains
+
+            // Use provider data (will be enriched later via ChainRegistry)
             return {
               chainId: chain.id,
               name: chain.name,
-              vmType: chain.vmType, // Store VM type from provider (if available)
+              vmType: chain.vmType,
               nativeCurrencyName: chain.nativeCurrency.name,
               nativeCurrencySymbol: chain.nativeCurrency.symbol,
               nativeCurrencyDecimals: chain.nativeCurrency.decimals,

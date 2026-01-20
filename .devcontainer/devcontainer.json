@@ -53,6 +53,6 @@
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace",
   "postCreateCommand": "npm install -g pnpm && pnpm install && pnpm db:push",
-  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && sudo /usr/local/bin/init-postgres.sh && sleep 2 && pnpm db:push",
+  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && sudo /usr/local/bin/init-postgres.sh",
   "waitFor": "postStartCommand"
 }

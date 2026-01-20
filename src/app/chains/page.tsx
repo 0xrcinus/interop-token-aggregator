@@ -1,16 +1,18 @@
 import Link from "next/link"
-import { ChainsResponse } from "@/lib/api"
+import { Effect } from "effect"
+import { ChainApiService, ApiServicesLive } from "@/lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ChainIcon } from "@/components/chain-icon"
 
-async function getChains(): Promise<ChainsResponse> {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/api/chains`, {
-    next: { revalidate: 60 },
-  })
-  if (!res.ok) throw new Error("Failed to fetch chains")
-  return res.json()
+async function getChains() {
+  const program = Effect.gen(function* () {
+    const chainApi = yield* ChainApiService
+    return yield* chainApi.getChains
+  }).pipe(Effect.provide(ApiServicesLive), Effect.scoped)
+
+  return await Effect.runPromise(program)
 }
 
 export default async function ChainsPage() {

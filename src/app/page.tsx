@@ -1,23 +1,26 @@
 import Link from "next/link"
-import { ProvidersResponse, ChainsResponse } from "@/lib/api"
+import { Effect } from "effect"
+import { ProviderApiService, ChainApiService, ApiServicesLive } from "@/lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ArrowRight, Server, Network, Coins } from "lucide-react"
 
-async function getProviders(): Promise<ProvidersResponse> {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/api/providers`, {
-    next: { revalidate: 60 },
-  })
-  if (!res.ok) throw new Error("Failed to fetch providers")
-  return res.json()
+async function getProviders() {
+  const program = Effect.gen(function* () {
+    const providerApi = yield* ProviderApiService
+    return yield* providerApi.getProviders
+  }).pipe(Effect.provide(ApiServicesLive), Effect.scoped)
+
+  return await Effect.runPromise(program)
 }
 
-async function getChains(): Promise<ChainsResponse> {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/api/chains`, {
-    next: { revalidate: 60 },
-  })
-  if (!res.ok) throw new Error("Failed to fetch chains")
-  return res.json()
+async function getChains() {
+  const program = Effect.gen(function* () {
+    const chainApi = yield* ChainApiService
+    return yield* chainApi.getChains
+  }).pipe(Effect.provide(ApiServicesLive), Effect.scoped)
+
+  return await Effect.runPromise(program)
 }
 
 export default async function Home() {
