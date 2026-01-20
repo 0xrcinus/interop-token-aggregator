@@ -9,18 +9,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ChainIcon } from "@/components/chain-icon"
 
 interface Chain {
-  chainId: number
-  name: string
-  shortName: string | null
-  chainType: string | null
-  icon: string | null
-  explorers: Array<{ name: string; url: string }> | null
-  providers: string[]
-  tokenCount: string
+  readonly chainId: number
+  readonly name: string
+  readonly shortName?: string
+  readonly chainType?: string
+  readonly icon?: string
+  readonly explorers?: ReadonlyArray<{ readonly name: string; readonly url: string }>
+  readonly providers: ReadonlyArray<string>
+  readonly tokenCount: number
 }
 
 interface ChainsClientProps {
-  chains: Chain[]
+  chains: ReadonlyArray<Chain>
 }
 
 export function ChainsClient({ chains }: ChainsClientProps) {
@@ -111,7 +111,7 @@ export function ChainsClient({ chains }: ChainsClientProps) {
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
                     <Badge variant="outline">
-                      {Number(chain.tokenCount).toLocaleString()}
+                      {chain.tokenCount.toLocaleString()}
                     </Badge>
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">
