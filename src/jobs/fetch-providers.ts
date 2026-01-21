@@ -1,8 +1,8 @@
 import { Effect, Layer } from "effect"
 import { config } from "dotenv"
-import { AdminApiService, AdminApiServiceLive } from "../lib/api/admin"
+import { AdminApiService } from "../lib/api/admin"
 import { AllProvidersLive } from "../lib/providers"
-import { ChainRegistryLive } from "../lib/chains/registry"
+import { ChainRegistry } from "../lib/chains/registry"
 
 // Load environment variables
 config({ path: ".env.local" })
@@ -64,11 +64,11 @@ const program = Effect.gen(function* () {
 
 /**
  * Run the program with all required layers
- * AdminApiServiceLive needs AllProvidersLive and ChainRegistryLive
+ * AdminApiService.Default needs AllProvidersLive and ChainRegistry.Default
  */
 const AppLive = Layer.mergeAll(
-  AdminApiServiceLive,
-  ChainRegistryLive
+  AdminApiService.Default,
+  ChainRegistry.Default
 ).pipe(Layer.provideMerge(AllProvidersLive))
 
 Effect.runPromise(program.pipe(Effect.provide(AppLive), Effect.scoped))

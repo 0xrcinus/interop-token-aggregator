@@ -1,6 +1,6 @@
 import { PgClient } from "@effect/sql-pg"
 import * as PgDrizzle from "@effect/sql-drizzle/Pg"
-import { Config, Layer, Redacted } from "effect"
+import { Config, Effect, Layer, Redacted } from "effect"
 import { drizzle } from "drizzle-orm/postgres-js"
 import postgres from "postgres"
 import * as schema from "./schema"
@@ -20,15 +20,30 @@ import * as schema from "./schema"
  * - POSTGRES_SSL (default: false for local, true for Neon)
  *
  * Note: The standalone Drizzle client uses DATABASE_URL (see createDrizzleClient)
+ *
+ * Updated for Effect 0.94+: Uses Layer.unwrapEffect to resolve Config values
  */
-export const SqlLive = PgClient.layer({
-  host: Config.string("POSTGRES_HOST").pipe(Config.withDefault("localhost")),
-  port: Config.integer("POSTGRES_PORT").pipe(Config.withDefault(5433)),
-  database: Config.string("POSTGRES_DATABASE").pipe(Config.withDefault("tokendb")),
-  username: Config.string("POSTGRES_USER").pipe(Config.withDefault("dev")),
-  password: Config.redacted("POSTGRES_PASSWORD").pipe(Config.withDefault(Redacted.make("dev"))),
-  ssl: Config.boolean("POSTGRES_SSL").pipe(Config.withDefault(false)),
-})
+export const SqlLive = Layer.unwrapEffect(
+  Effect.gen(function* () {
+    const host = yield* Config.string("POSTGRES_HOST").pipe(Config.withDefault("localhost"))
+    const port = yield* Config.integer("POSTGRES_PORT").pipe(Config.withDefault(5433))
+    const database = yield* Config.string("POSTGRES_DATABASE").pipe(Config.withDefault("tokendb"))
+    const username = yield* Config.string("POSTGRES_USER").pipe(Config.withDefault("dev"))
+    const password = yield* Config.redacted("POSTGRES_PASSWORD").pipe(
+      Config.withDefault(Redacted.make("dev"))
+    )
+    const ssl = yield* Config.boolean("POSTGRES_SSL").pipe(Config.withDefault(false))
+
+    return PgClient.layer({
+      host,
+      port,
+      database,
+      username,
+      password,
+      ssl,
+    })
+  })
+)
 
 /**
  * Drizzle ORM layer integrated with Effect SQL

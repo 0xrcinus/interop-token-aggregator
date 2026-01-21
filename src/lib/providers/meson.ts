@@ -1,13 +1,9 @@
-import { Context, Effect, Layer } from "effect"
-import * as Schema from "@effect/schema/Schema"
-import * as Pg from "@effect/sql-drizzle/Pg"
-import { HttpClient } from "@effect/platform"
-import type { Scope } from "effect"
+import { Effect, Schema } from "effect"
 import { fetchJson } from "./http"
 import { normalizeAddress } from "../aggregation/normalize"
 import { categorizeToken } from "../aggregation/categorize"
 import { isEvmChain } from "../aggregation/chain-mapping"
-import { Chain, Token, ProviderResponse, ProviderError } from "./types"
+import type { Chain, Token, ProviderResponse } from "./types"
 import { createProviderFetch } from "./factory"
 
 const PROVIDER_NAME = "meson"
@@ -35,77 +31,67 @@ const MesonResponseSchema = Schema.Struct({
 /**
  * Meson Provider Service
  */
-export class MesonProvider extends Context.Tag("MesonProvider")<
-  MesonProvider,
-  {
-    readonly fetch: Effect.Effect<ProviderResponse, ProviderError, HttpClient.HttpClient | Scope.Scope | Pg.PgDrizzle>
-  }
->() {}
+export class MesonProvider extends Effect.Service<MesonProvider>()("MesonProvider", {
+  effect: Effect.gen(function* () {
+    const fetch = createProviderFetch(
+      PROVIDER_NAME,
+      Effect.gen(function* () {
+        // Fetch chain/token data
+        const raw = yield* fetchJson(API_URL)
+        const response = yield* Schema.decodeUnknown(MesonResponseSchema)(raw)
 
-const make = Effect.gen(function* () {
-  const fetch = createProviderFetch(
-    PROVIDER_NAME,
-    Effect.gen(function* () {
-      // Fetch chain/token data
-      const raw = yield* fetchJson(API_URL)
-      const response = yield* Schema.decodeUnknown(MesonResponseSchema)(raw)
+        const chains: Chain[] = []
+        const tokens: Token[] = []
 
-      const chains: Chain[] = []
-      const tokens: Token[] = []
+        for (const chain of response.result) {
+          // Handle hex and decimal chain IDs
+          let chainId: number
+          if (chain.chainId.startsWith("0x")) {
+            chainId = parseInt(chain.chainId, 16)
+          } else {
+            chainId = parseInt(chain.chainId, 10)
+          }
 
-      for (const chain of response.result) {
-        // Handle hex and decimal chain IDs
-        let chainId: number
-        if (chain.chainId.startsWith("0x")) {
-          chainId = parseInt(chain.chainId, 16)
-        } else {
-          chainId = parseInt(chain.chainId, 10)
-        }
+          if (isNaN(chainId)) continue
 
-        if (isNaN(chainId)) continue
-
-        chains.push({
-          id: chainId,
-          name: chain.name,
-          nativeCurrency: {
-            name: "Unknown",
-            symbol: "Unknown",
-            decimals: 18,
-          },
-        })
-
-        for (const token of chain.tokens) {
-          if (!token.addr) continue
-
-          const isEvm = isEvmChain(chainId)
-          const address = normalizeAddress(token.addr, isEvm)
-          const symbol = token.id.toUpperCase()
-          const tags = categorizeToken(symbol, symbol, address)
-
-          tokens.push({
-            address,
-            symbol,
-            name: symbol, // No name provided
-            decimals: undefined, // Meson API doesn't provide decimals
-            chainId,
-            logoURI: undefined,
-            tags,
+          chains.push({
+            id: chainId,
+            name: chain.name,
+            nativeCurrency: {
+              name: "Unknown",
+              symbol: "Unknown",
+              decimals: 18,
+            },
           })
+
+          for (const token of chain.tokens) {
+            if (!token.addr) continue
+
+            const isEvm = isEvmChain(chainId)
+            const address = normalizeAddress(token.addr, isEvm)
+            const symbol = token.id.toUpperCase()
+            const tags = categorizeToken(symbol, symbol, address)
+
+            tokens.push({
+              address,
+              symbol,
+              name: symbol, // No name provided
+              decimals: undefined, // Meson API doesn't provide decimals
+              chainId,
+              logoURI: undefined,
+              tags,
+            })
+          }
         }
-      }
 
-      console.log(
-        `[${PROVIDER_NAME}] Found ${chains.length} chains and ${tokens.length} tokens`
-      )
+        console.log(
+          `[${PROVIDER_NAME}] Found ${chains.length} chains and ${tokens.length} tokens`
+        )
 
-      return { chains, tokens }
-    })
-  )
+        return { chains, tokens }
+      })
+    )
 
-  return { fetch }
-})
-
-/**
- * Meson Provider Layer
- */
-export const MesonProviderLive = Layer.effect(MesonProvider, make)
+    return { fetch }
+  })
+}) {}

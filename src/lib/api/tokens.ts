@@ -2,7 +2,7 @@
  * Effect-based service layer for token API operations
  */
 
-import { Effect, Context, Layer, Data } from "effect"
+import { Effect, Data } from "effect"
 import * as Pg from "@effect/sql-drizzle/Pg"
 import { SqlError } from "@effect/sql/SqlError"
 import { tokens, chains } from "@/lib/db/schema"
@@ -88,23 +88,12 @@ export class TokenNotFoundError extends Data.TaggedError("TokenNotFoundError")<{
   readonly symbol: string
 }> {}
 
-export class TokenApiService extends Context.Tag("TokenApiService")<
-  TokenApiService,
-  {
-    readonly getTokens: (
-      query: TokenListQuery
-    ) => Effect.Effect<TokensResponse, TokenApiError | SqlError>
-    readonly getTokenBySymbol: (
-      symbol: string
-    ) => Effect.Effect<TokenDetailResponse, TokenApiError | TokenNotFoundError | SqlError>
-  }
->() {}
+export class TokenApiService extends Effect.Service<TokenApiService>()("TokenApiService", {
+  effect: Effect.gen(function* () {
+    const drizzle = yield* Pg.PgDrizzle
 
-const make = Effect.gen(function* () {
-  const drizzle = yield* Pg.PgDrizzle
-
-  const getTokens = (query: TokenListQuery) =>
-    Effect.gen(function* () {
+    const getTokens = (query: TokenListQuery) =>
+      Effect.gen(function* () {
       // Build base query
       let dbQuery = drizzle
         .select({
@@ -318,7 +307,6 @@ const make = Effect.gen(function* () {
       })
     )
 
-  return { getTokens, getTokenBySymbol }
-})
-
-export const TokenApiServiceLive = Layer.effect(TokenApiService, make)
+    return { getTokens, getTokenBySymbol }
+  })
+}) {}

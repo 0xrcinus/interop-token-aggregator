@@ -1,4 +1,4 @@
-import * as Schema from "@effect/schema/Schema"
+import { Schema } from "effect"
 
 /**
  * Schema for native currency information

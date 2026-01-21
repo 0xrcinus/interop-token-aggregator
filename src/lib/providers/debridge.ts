@@ -1,13 +1,9 @@
-import { Context, Effect, Layer } from "effect"
-import * as Schema from "@effect/schema/Schema"
-import * as Pg from "@effect/sql-drizzle/Pg"
-import { HttpClient } from "@effect/platform"
-import type { Scope } from "effect"
+import { Effect, Schema } from "effect"
 import { fetchJson } from "./http"
 import { normalizeAddress } from "../aggregation/normalize"
 import { categorizeToken } from "../aggregation/categorize"
 import { isEvmChain } from "../aggregation/chain-mapping"
-import { Chain, Token, ProviderResponse, ProviderError } from "./types"
+import type { Chain, Token, ProviderResponse } from "./types"
 import { createProviderFetch } from "./factory"
 
 const PROVIDER_NAME = "debridge"
@@ -56,93 +52,83 @@ const DebridgeTokensResponseSchema = Schema.Struct({
 /**
  * DeBridge Provider Service
  */
-export class DebridgeProvider extends Context.Tag("DebridgeProvider")<
-  DebridgeProvider,
-  {
-    readonly fetch: Effect.Effect<ProviderResponse, ProviderError, HttpClient.HttpClient | Scope.Scope | Pg.PgDrizzle>
-  }
->() {}
+export class DebridgeProvider extends Effect.Service<DebridgeProvider>()("DebridgeProvider", {
+  effect: Effect.gen(function* () {
+    const fetch = createProviderFetch(
+      PROVIDER_NAME,
+      Effect.gen(function* () {
+        // Fetch chains list
+        const chainsRaw = yield* fetchJson(CHAINS_URL)
+        const chainsResponse = yield* Schema.decodeUnknown(DebridgeChainsResponseSchema)(chainsRaw)
 
-const make = Effect.gen(function* () {
-  const fetch = createProviderFetch(
-    PROVIDER_NAME,
-    Effect.gen(function* () {
-      // Fetch chains list
-      const chainsRaw = yield* fetchJson(CHAINS_URL)
-      const chainsResponse = yield* Schema.decodeUnknown(DebridgeChainsResponseSchema)(chainsRaw)
+        console.log(
+          `[${PROVIDER_NAME}] Received ${chainsResponse.chains.length} chains from API`
+        )
 
-      console.log(
-        `[${PROVIDER_NAME}] Received ${chainsResponse.chains.length} chains from API`
-      )
+        // Filter EVM chains
+        const evmChains = chainsResponse.chains.filter(
+          (chain) => !NON_EVM_CHAIN_IDS.has(chain.chainId)
+        )
 
-      // Filter EVM chains
-      const evmChains = chainsResponse.chains.filter(
-        (chain) => !NON_EVM_CHAIN_IDS.has(chain.chainId)
-      )
+        console.log(
+          `[${PROVIDER_NAME}] Filtered to ${evmChains.length} EVM chains`
+        )
 
-      console.log(
-        `[${PROVIDER_NAME}] Filtered to ${evmChains.length} EVM chains`
-      )
+        const chains: Chain[] = evmChains.map((chain) => ({
+          id: chain.originalChainId || chain.chainId,
+          name: chain.chainName,
+          nativeCurrency: {
+            name: "Unknown",
+            symbol: "Unknown",
+            decimals: 18,
+          },
+        }))
 
-      const chains: Chain[] = evmChains.map((chain) => ({
-        id: chain.originalChainId || chain.chainId,
-        name: chain.chainName,
-        nativeCurrency: {
-          name: "Unknown",
-          symbol: "Unknown",
-          decimals: 18,
-        },
-      }))
+        // Fetch tokens per chain in parallel (with error handling)
+        const tokenResults = yield* Effect.all(
+          evmChains.map((chain) =>
+            Effect.gen(function* () {
+              const chainId = chain.originalChainId || chain.chainId
+              const tokensRaw = yield* fetchJson(TOKENS_URL_TEMPLATE + chain.chainId)
+              const tokensResponse = yield* Schema.decodeUnknown(DebridgeTokensResponseSchema)(tokensRaw)
 
-      // Fetch tokens per chain in parallel (with error handling)
-      const tokenResults = yield* Effect.all(
-        evmChains.map((chain) =>
-          Effect.gen(function* () {
-            const chainId = chain.originalChainId || chain.chainId
-            const tokensRaw = yield* fetchJson(TOKENS_URL_TEMPLATE + chain.chainId)
-            const tokensResponse = yield* Schema.decodeUnknown(DebridgeTokensResponseSchema)(tokensRaw)
+              return Object.values(tokensResponse.tokens)
+                .filter((token) => token.symbol && token.name && token.decimals !== undefined && EVM_ADDRESS_REGEX.test(token.address))
+                .map((token) => {
+                  const isEvm = isEvmChain(chainId)
+                  const address = normalizeAddress(token.address, isEvm)
+                  const tags = categorizeToken(token.symbol!, token.name!, address)
 
-            return Object.values(tokensResponse.tokens)
-              .filter((token) => token.symbol && token.name && token.decimals !== undefined && EVM_ADDRESS_REGEX.test(token.address))
-              .map((token) => {
-                const isEvm = isEvmChain(chainId)
-                const address = normalizeAddress(token.address, isEvm)
-                const tags = categorizeToken(token.symbol!, token.name!, address)
-
-                return {
-                  address,
-                  symbol: token.symbol!,
-                  name: token.name!,
-                  decimals: token.decimals,
-                  chainId,
-                  logoURI: token.logoURI,
-                  tags,
-                }
+                  return {
+                    address,
+                    symbol: token.symbol!,
+                    name: token.name!,
+                    decimals: token.decimals,
+                    chainId,
+                    logoURI: token.logoURI,
+                    tags,
+                  }
+                })
+            }).pipe(
+              Effect.catchAll((error) => {
+                console.log(`[${PROVIDER_NAME}] Failed to fetch tokens for chain ${chain.chainId}: ${error}`)
+                return Effect.succeed([])
               })
-          }).pipe(
-            Effect.catchAll((error) => {
-              console.log(`[${PROVIDER_NAME}] Failed to fetch tokens for chain ${chain.chainId}: ${error}`)
-              return Effect.succeed([])
-            })
-          )
-        ),
-        { concurrency: "unbounded" }
-      )
+            )
+          ),
+          { concurrency: "unbounded" }
+        )
 
-      const tokens: Token[] = tokenResults.flat()
+        const tokens: Token[] = tokenResults.flat()
 
-      console.log(
-        `[${PROVIDER_NAME}] Found ${chains.length} chains and ${tokens.length} tokens`
-      )
+        console.log(
+          `[${PROVIDER_NAME}] Found ${chains.length} chains and ${tokens.length} tokens`
+        )
 
-      return { chains, tokens }
-    })
-  )
+        return { chains, tokens }
+      })
+    )
 
-  return { fetch }
-})
-
-/**
- * DeBridge Provider Layer
- */
-export const DebridgeProviderLive = Layer.effect(DebridgeProvider, make)
+    return { fetch }
+  })
+}) {}

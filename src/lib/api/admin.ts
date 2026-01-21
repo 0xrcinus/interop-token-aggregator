@@ -2,7 +2,7 @@
  * Effect-based service layer for admin operations
  */
 
-import { Effect, Context, Layer, Data } from "effect"
+import { Effect, Data } from "effect"
 import {
   AllProvidersLive,
   RelayProvider,
@@ -63,19 +63,10 @@ export class AdminApiError extends Data.TaggedError("AdminApiError")<{
 /**
  * Admin API Service
  */
-export class AdminApiService extends Context.Tag("AdminApiService")<
-  AdminApiService,
-  {
-    readonly triggerFetch: Effect.Effect<FetchResponse, AdminApiError, ChainRegistry | HttpClient.HttpClient | Scope.Scope | Pg.PgDrizzle>
-  }
->() {}
-
-/**
- * Implementation of Admin API Service
- */
-const make = Effect.gen(function* () {
-  // Get all 12 provider services
-  const relay = yield* RelayProvider
+export class AdminApiService extends Effect.Service<AdminApiService>()("AdminApiService", {
+  effect: Effect.gen(function* () {
+    // Get all 12 provider services
+    const relay = yield* RelayProvider
   const lifi = yield* LifiProvider
   const across = yield* AcrossProvider
   const stargate = yield* StargateProvider
@@ -159,11 +150,6 @@ const make = Effect.gen(function* () {
     Effect.mapError((error) => new AdminApiError({ message: "Failed to trigger fetch", cause: error }))
   )
 
-  return { triggerFetch }
-})
-
-/**
- * Live implementation layer
- * Requires provider services to be provided
- */
-export const AdminApiServiceLive = Layer.effect(AdminApiService, make)
+    return { triggerFetch }
+  })
+}) {}

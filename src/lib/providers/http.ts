@@ -1,5 +1,14 @@
 import { HttpClient } from "@effect/platform"
-import { Effect } from "effect"
+import { Effect, Data } from "effect"
+
+/**
+ * HTTP fetch error with tagged error pattern
+ */
+export class HttpFetchError extends Data.TaggedError("HttpFetchError")<{
+  readonly url: string
+  readonly message: string
+  readonly cause?: unknown
+}> {}
 
 /**
  * Fetch JSON from a URL using Effect's HttpClient
@@ -12,7 +21,13 @@ export const fetchJson = (url: string) =>
     const response = yield* client.get(url).pipe(
       Effect.flatMap((res) => res.json),
       Effect.timeout("30 seconds"),
-      Effect.mapError((error) => new Error(`Failed to fetch ${url}: ${String(error)}`))
+      Effect.mapError((error) =>
+        new HttpFetchError({
+          url,
+          message: `Failed to fetch ${url}`,
+          cause: error
+        })
+      )
     )
 
     return response

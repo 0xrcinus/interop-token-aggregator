@@ -3,7 +3,7 @@
  * This demonstrates Effect patterns for database queries and error handling
  */
 
-import { Effect, Context, Layer } from "effect"
+import { Effect } from "effect"
 import * as Pg from "@effect/sql-drizzle/Pg"
 import { SqlError } from "@effect/sql/SqlError"
 import { providerFetches, tokens } from "@/lib/db/schema"
@@ -57,84 +57,70 @@ export class ProviderApiError extends Error {
 
 /**
  * Provider API Service
- * Demonstrates Effect Context.Tag pattern for dependency injection
+ * Uses Effect.Service pattern for dependency injection
  */
-export class ProviderApiService extends Context.Tag("ProviderApiService")<
-  ProviderApiService,
-  {
-    readonly getProviders: Effect.Effect<ProvidersResponse, ProviderApiError | SqlError>
-    readonly getProviderMetadata: (provider: string) => Effect.Effect<ProviderMetadata, ProviderApiError | SqlError>
-  }
->() {}
+export class ProviderApiService extends Effect.Service<ProviderApiService>()("ProviderApiService", {
+  effect: Effect.gen(function* () {
+    const drizzle = yield* Pg.PgDrizzle
 
-/**
- * Implementation of Provider API Service
- * Uses Effect.gen for composable operations
- */
-const make = Effect.gen(function* () {
-  const drizzle = yield* Pg.PgDrizzle
-
-  const getProviders = Effect.gen(function* () {
-    // First get aggregated stats per provider
-    const stats = yield* drizzle
-      .select({
-        providerName: providerFetches.providerName,
-        totalFetches: sql<number>`COUNT(*)`,
-        successfulFetches: sql<number>`SUM(CASE WHEN ${providerFetches.success} THEN 1 ELSE 0 END)`,
-        failedFetches: sql<number>`SUM(CASE WHEN NOT ${providerFetches.success} THEN 1 ELSE 0 END)`,
-      })
+    const getProviders = Effect.gen(function* () {
+    // Get all provider fetches and group them to find latest per provider
+    const allFetches = yield* drizzle
+      .select()
       .from(providerFetches)
-      .groupBy(providerFetches.providerName)
+      .orderBy(providerFetches.fetchedAt)
 
-    // Then get latest fetch info for each provider using DISTINCT ON
-    // Use Effect SQL's sql template for raw queries
-    const latestFetchesResult = yield* Effect.tryPromise({
-      try: () =>
-        drizzle.execute(sql`
-          SELECT DISTINCT ON (provider_name)
-            provider_name,
-            fetched_at,
-            success,
-            chains_count,
-            tokens_count,
-            error_message
-          FROM provider_fetches
-          ORDER BY provider_name, fetched_at DESC
-        `),
-      catch: (error) => new ProviderApiError("Failed to fetch latest provider data", error),
-    })
+    // Group by provider and get latest + stats
+    const providerMap = new Map<string, {
+      latest: typeof allFetches[0],
+      total: number,
+      successful: number,
+      failed: number
+    }>()
 
-    // Combine stats with latest fetch info
-    const statsMap = new Map(stats.map((s) => [s.providerName, s]))
-
-    const providers: ProviderSummary[] = (latestFetchesResult as any[]).map((latest: any) => {
-      const providerStats = statsMap.get(latest.provider_name) || {
-        totalFetches: 0,
-        successfulFetches: 0,
-        failedFetches: 0,
+    for (const fetch of allFetches) {
+      const existing = providerMap.get(fetch.providerName)
+      if (!existing) {
+        providerMap.set(fetch.providerName, {
+          latest: fetch,
+          total: 1,
+          successful: fetch.success ? 1 : 0,
+          failed: fetch.success ? 0 : 1
+        })
+      } else {
+        // Update to latest (ordered by fetchedAt)
+        existing.latest = fetch
+        existing.total++
+        if (fetch.success) {
+          existing.successful++
+        } else {
+          existing.failed++
+        }
       }
+    }
 
-      return {
-        name: latest.provider_name,
-        status: latest.success ? "healthy" : "error",
-        lastFetchedAt: latest.fetched_at,
+    const providers: ProviderSummary[] = Array.from(providerMap.entries())
+      .map(([name, data]) => ({
+        name,
+        status: (data.latest.success ? "healthy" : "error") as "healthy" | "error",
+        lastFetchedAt: data.latest.fetchedAt,
         successRate:
-          providerStats.totalFetches > 0
-            ? ((providerStats.successfulFetches / providerStats.totalFetches) * 100).toFixed(1) + "%"
+          data.total > 0
+            ? ((data.successful / data.total) * 100).toFixed(1) + "%"
             : "0%",
         stats: {
-          totalFetches: providerStats.totalFetches,
-          successfulFetches: providerStats.successfulFetches,
-          failedFetches: providerStats.failedFetches,
+          totalFetches: data.total,
+          successfulFetches: data.successful,
+          failedFetches: data.failed,
         },
         lastFetch: {
-          success: latest.success,
-          chainsCount: latest.chains_count,
-          tokensCount: latest.tokens_count,
-          error: latest.error_message,
+          success: data.latest.success,
+          chainsCount: data.latest.chainsCount,
+          tokensCount: data.latest.tokensCount,
+          error: data.latest.errorMessage,
         },
-      }
-    })
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name)) // Sort alphabetically by name
 
     return {
       providers,
@@ -188,11 +174,6 @@ const make = Effect.gen(function* () {
       )
     )
 
-  return { getProviders, getProviderMetadata }
-})
-
-/**
- * Live implementation layer
- * Requires PgDrizzle to be provided
- */
-export const ProviderApiServiceLive = Layer.effect(ProviderApiService, make)
+    return { getProviders, getProviderMetadata }
+  })
+}) {}

@@ -2,7 +2,7 @@
  * Effect-based service layer for chain API operations
  */
 
-import { Effect, Context, Layer } from "effect"
+import { Effect } from "effect"
 import * as Pg from "@effect/sql-drizzle/Pg"
 import { SqlError } from "@effect/sql/SqlError"
 import { chains, chainProviderSupport, tokens } from "@/lib/db/schema"
@@ -46,18 +46,11 @@ export class ChainApiError extends Error {
   }
 }
 
-export class ChainApiService extends Context.Tag("ChainApiService")<
-  ChainApiService,
-  {
-    readonly getChains: Effect.Effect<ChainsResponse, ChainApiError | SqlError>
-    readonly getChainById: (chainId: number) => Effect.Effect<ChainInfo, ChainApiError | SqlError>
-  }
->() {}
+export class ChainApiService extends Effect.Service<ChainApiService>()("ChainApiService", {
+  effect: Effect.gen(function* () {
+    const drizzle = yield* Pg.PgDrizzle
 
-const make = Effect.gen(function* () {
-  const drizzle = yield* Pg.PgDrizzle
-
-  const getChains = Effect.gen(function* () {
+    const getChains = Effect.gen(function* () {
     const chainList = yield* drizzle
       .select({
         chainId: chains.chainId,
@@ -187,7 +180,6 @@ const make = Effect.gen(function* () {
       )
     )
 
-  return { getChains, getChainById }
-})
-
-export const ChainApiServiceLive = Layer.effect(ChainApiService, make)
+    return { getChains, getChainById }
+  })
+}) {}

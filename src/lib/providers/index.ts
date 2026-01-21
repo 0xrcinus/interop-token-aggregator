@@ -1,19 +1,19 @@
 import { Layer } from "effect"
 import { NodeHttpClient } from "@effect/platform-node"
 import { DatabaseLive } from "../db/layer"
-import { ChainRegistryLive } from "../chains/registry"
-import { RelayProvider, RelayProviderLive } from "./relay"
-import { LifiProvider, LifiProviderLive } from "./lifi"
-import { AcrossProvider, AcrossProviderLive } from "./across"
-import { StargateProvider, StargateProviderLive } from "./stargate"
-import { DebridgeProvider, DebridgeProviderLive } from "./debridge"
-import { MayanProvider, MayanProviderLive } from "./mayan"
-import { RhinoProvider, RhinoProviderLive } from "./rhino"
-import { GasZipProvider, GasZipProviderLive } from "./gaszip"
-import { AoriProvider, AoriProviderLive } from "./aori"
-import { EcoProvider, EcoProviderLive } from "./eco"
-import { MesonProvider, MesonProviderLive } from "./meson"
-import { ButterProvider, ButterProviderLive } from "./butter"
+import { ChainRegistry } from "../chains/registry"
+import { RelayProvider } from "./relay"
+import { LifiProvider } from "./lifi"
+import { AcrossProvider } from "./across"
+import { StargateProvider } from "./stargate"
+import { DebridgeProvider } from "./debridge"
+import { MayanProvider } from "./mayan"
+import { RhinoProvider } from "./rhino"
+import { GasZipProvider } from "./gaszip"
+import { AoriProvider } from "./aori"
+import { EcoProvider } from "./eco"
+import { MesonProvider } from "./meson"
+import { ButterProvider } from "./butter"
 
 /**
  * Export all provider services
@@ -34,29 +34,14 @@ export {
 }
 
 /**
- * Export all provider layers (without dependencies)
- */
-export {
-  RelayProviderLive,
-  LifiProviderLive,
-  AcrossProviderLive,
-  StargateProviderLive,
-  DebridgeProviderLive,
-  MayanProviderLive,
-  RhinoProviderLive,
-  GasZipProviderLive,
-  AoriProviderLive,
-  EcoProviderLive,
-  MesonProviderLive,
-  ButterProviderLive,
-}
-
-/**
  * Combined layer with all dependencies provided
  * Following the pattern: Layer.provideMerge for nested dependencies
+ *
+ * With Effect.Service pattern, services automatically generate a .Default layer
+ * that we can use directly.
  */
 // ChainRegistry needs HttpClient, so provide it explicitly
-const ChainRegistryWithHttp = ChainRegistryLive.pipe(
+const ChainRegistryWithHttp = ChainRegistry.Default.pipe(
   Layer.provide(NodeHttpClient.layerUndici)
 )
 
@@ -66,18 +51,18 @@ const ProvidersBaseLive = Layer.mergeAll(
   ChainRegistryWithHttp
 )
 
-const RelayLive = RelayProviderLive.pipe(Layer.provideMerge(ProvidersBaseLive))
-const LifiLive = LifiProviderLive.pipe(Layer.provideMerge(ProvidersBaseLive))
-const AcrossLive = AcrossProviderLive.pipe(Layer.provideMerge(ProvidersBaseLive))
-const StargateLive = StargateProviderLive.pipe(Layer.provideMerge(ProvidersBaseLive))
-const DebridgeLive = DebridgeProviderLive.pipe(Layer.provideMerge(ProvidersBaseLive))
-const MayanLive = MayanProviderLive.pipe(Layer.provideMerge(ProvidersBaseLive))
-const RhinoLive = RhinoProviderLive.pipe(Layer.provideMerge(ProvidersBaseLive))
-const GasZipLive = GasZipProviderLive.pipe(Layer.provideMerge(ProvidersBaseLive))
-const AoriLive = AoriProviderLive.pipe(Layer.provideMerge(ProvidersBaseLive))
-const EcoLive = EcoProviderLive.pipe(Layer.provideMerge(ProvidersBaseLive))
-const MesonLive = MesonProviderLive.pipe(Layer.provideMerge(ProvidersBaseLive))
-const ButterLive = ButterProviderLive.pipe(Layer.provideMerge(ProvidersBaseLive))
+const RelayLive = RelayProvider.Default.pipe(Layer.provideMerge(ProvidersBaseLive))
+const LifiLive = LifiProvider.Default.pipe(Layer.provideMerge(ProvidersBaseLive))
+const AcrossLive = AcrossProvider.Default.pipe(Layer.provideMerge(ProvidersBaseLive))
+const StargateLive = StargateProvider.Default.pipe(Layer.provideMerge(ProvidersBaseLive))
+const DebridgeLive = DebridgeProvider.Default.pipe(Layer.provideMerge(ProvidersBaseLive))
+const MayanLive = MayanProvider.Default.pipe(Layer.provideMerge(ProvidersBaseLive))
+const RhinoLive = RhinoProvider.Default.pipe(Layer.provideMerge(ProvidersBaseLive))
+const GasZipLive = GasZipProvider.Default.pipe(Layer.provideMerge(ProvidersBaseLive))
+const AoriLive = AoriProvider.Default.pipe(Layer.provideMerge(ProvidersBaseLive))
+const EcoLive = EcoProvider.Default.pipe(Layer.provideMerge(ProvidersBaseLive))
+const MesonLive = MesonProvider.Default.pipe(Layer.provideMerge(ProvidersBaseLive))
+const ButterLive = ButterProvider.Default.pipe(Layer.provideMerge(ProvidersBaseLive))
 
 /**
  * Combined layer with all providers and their dependencies

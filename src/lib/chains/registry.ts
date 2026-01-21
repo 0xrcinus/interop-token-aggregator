@@ -3,9 +3,8 @@
  * Fetches and enriches chain metadata from Chainlist (chainid.network)
  */
 
-import { Effect, Context, Layer } from "effect"
+import { Effect, Schema } from "effect"
 import { HttpClient } from "@effect/platform"
-import * as Schema from "@effect/schema/Schema"
 
 // Chainlist API response schema
 const ChainlistChainSchema = Schema.Struct({
@@ -81,22 +80,13 @@ export class ChainRegistryError extends Schema.TaggedError<ChainRegistryError>()
  * Chain Registry Service
  * Provides access to chain metadata from Chainlist
  */
-export class ChainRegistry extends Context.Tag("ChainRegistry")<
-  ChainRegistry,
-  {
-    readonly fetchAll: Effect.Effect<ChainMetadata[], ChainRegistryError>
-    readonly fetchByChainId: (
-      chainId: number
-    ) => Effect.Effect<ChainMetadata | null, ChainRegistryError>
-  }
->() {}
-
 const CHAINLIST_API = "https://chainid.network/chains.json"
 
-const make = Effect.gen(function* () {
-  const client = yield* HttpClient.HttpClient
+export class ChainRegistry extends Effect.Service<ChainRegistry>()("ChainRegistry", {
+  effect: Effect.gen(function* () {
+    const client = yield* HttpClient.HttpClient
 
-  const fetchAll = Effect.gen(function* () {
+    const fetchAll = Effect.gen(function* () {
     console.log("[ChainRegistry] Fetching chain metadata from Chainlist...")
 
     // Fetch with timeout and retry
@@ -149,13 +139,12 @@ const make = Effect.gen(function* () {
     return metadata
   }).pipe(Effect.scoped)
 
-  const fetchByChainId = (chainId: number) =>
-    Effect.gen(function* () {
-      const allChains = yield* fetchAll
-      return allChains.find((c) => c.chainId === chainId) ?? null
-    })
+    const fetchByChainId = (chainId: number) =>
+      Effect.gen(function* () {
+        const allChains = yield* fetchAll
+        return allChains.find((c) => c.chainId === chainId) ?? null
+      })
 
-  return { fetchAll, fetchByChainId }
-})
-
-export const ChainRegistryLive = Layer.effect(ChainRegistry, make)
+    return { fetchAll, fetchByChainId }
+  })
+}) {}

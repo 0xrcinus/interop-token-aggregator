@@ -1,11 +1,8 @@
-import { Context, Effect, Layer } from "effect"
-import * as Pg from "@effect/sql-drizzle/Pg"
-import { HttpClient } from "@effect/platform"
-import type { Scope } from "effect"
+import { Effect } from "effect"
 import { normalizeAddress } from "../aggregation/normalize"
 import { categorizeToken } from "../aggregation/categorize"
 import { isEvmChain } from "../aggregation/chain-mapping"
-import { Chain, Token, ProviderResponse, ProviderError } from "./types"
+import type { Chain, Token, ProviderResponse } from "./types"
 import { createProviderFetch } from "./factory"
 
 const PROVIDER_NAME = "eco"
@@ -99,59 +96,49 @@ const SUPPORTED_TOKENS = [
 /**
  * Eco Provider Service
  */
-export class EcoProvider extends Context.Tag("EcoProvider")<
-  EcoProvider,
-  {
-    readonly fetch: Effect.Effect<ProviderResponse, ProviderError, HttpClient.HttpClient | Scope.Scope | Pg.PgDrizzle>
-  }
->() {}
+export class EcoProvider extends Effect.Service<EcoProvider>()("EcoProvider", {
+  effect: Effect.gen(function* () {
+    const fetch = createProviderFetch(
+      PROVIDER_NAME,
+      Effect.gen(function* () {
+        // No external fetch - static data
+        const chains: Chain[] = SUPPORTED_CHAINS.map((chain) => ({
+          id: chain.id,
+          name: chain.name,
+          nativeCurrency: {
+            name: "Unknown",
+            symbol: "Unknown",
+            decimals: 18,
+          },
+        }))
 
-const make = Effect.gen(function* () {
-  const fetch = createProviderFetch(
-    PROVIDER_NAME,
-    Effect.gen(function* () {
-      // No external fetch - static data
-      const chains: Chain[] = SUPPORTED_CHAINS.map((chain) => ({
-        id: chain.id,
-        name: chain.name,
-        nativeCurrency: {
-          name: "Unknown",
-          symbol: "Unknown",
-          decimals: 18,
-        },
-      }))
+        const tokens: Token[] = SUPPORTED_TOKENS.flatMap((tokenDef) =>
+          Object.entries(tokenDef.addresses).map(([chainIdStr, address]) => {
+            const chainId = parseInt(chainIdStr, 10)
+            const isEvm = isEvmChain(chainId)
+            const normalizedAddress = normalizeAddress(address, isEvm)
+            const tags = categorizeToken(tokenDef.symbol, tokenDef.name, normalizedAddress)
 
-      const tokens: Token[] = SUPPORTED_TOKENS.flatMap((tokenDef) =>
-        Object.entries(tokenDef.addresses).map(([chainIdStr, address]) => {
-          const chainId = parseInt(chainIdStr, 10)
-          const isEvm = isEvmChain(chainId)
-          const normalizedAddress = normalizeAddress(address, isEvm)
-          const tags = categorizeToken(tokenDef.symbol, tokenDef.name, normalizedAddress)
+            return {
+              address: normalizedAddress,
+              symbol: tokenDef.symbol,
+              name: tokenDef.name,
+              decimals: tokenDef.decimals,
+              chainId,
+              logoURI: undefined,
+              tags,
+            }
+          })
+        )
 
-          return {
-            address: normalizedAddress,
-            symbol: tokenDef.symbol,
-            name: tokenDef.name,
-            decimals: tokenDef.decimals,
-            chainId,
-            logoURI: undefined,
-            tags,
-          }
-        })
-      )
+        console.log(
+          `[${PROVIDER_NAME}] Found ${chains.length} chains and ${tokens.length} tokens`
+        )
 
-      console.log(
-        `[${PROVIDER_NAME}] Found ${chains.length} chains and ${tokens.length} tokens`
-      )
+        return { chains, tokens }
+      })
+    )
 
-      return { chains, tokens }
-    })
-  )
-
-  return { fetch }
-})
-
-/**
- * Eco Provider Layer
- */
-export const EcoProviderLive = Layer.effect(EcoProvider, make)
+    return { fetch }
+  })
+}) {}

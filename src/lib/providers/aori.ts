@@ -1,13 +1,9 @@
-import { Context, Effect, Layer } from "effect"
-import * as Schema from "@effect/schema/Schema"
-import * as Pg from "@effect/sql-drizzle/Pg"
-import { HttpClient } from "@effect/platform"
-import type { Scope } from "effect"
+import { Effect, Schema } from "effect"
 import { fetchJson } from "./http"
 import { normalizeAddress } from "../aggregation/normalize"
 import { categorizeToken } from "../aggregation/categorize"
 import { isEvmChain } from "../aggregation/chain-mapping"
-import { Chain, Token, ProviderResponse, ProviderError } from "./types"
+import type { Chain, Token, ProviderResponse } from "./types"
 import { createProviderFetch } from "./factory"
 
 const PROVIDER_NAME = "aori"
@@ -34,15 +30,9 @@ const AoriTokenSchema = Schema.Struct({
 /**
  * Aori Provider Service
  */
-export class AoriProvider extends Context.Tag("AoriProvider")<
-  AoriProvider,
-  {
-    readonly fetch: Effect.Effect<ProviderResponse, ProviderError, HttpClient.HttpClient | Scope.Scope | Pg.PgDrizzle>
-  }
->() {}
-
-const make = Effect.gen(function* () {
-  const fetch = createProviderFetch(
+export class AoriProvider extends Effect.Service<AoriProvider>()("AoriProvider", {
+  effect: Effect.gen(function* () {
+    const fetch = createProviderFetch(
     PROVIDER_NAME,
     Effect.gen(function* () {
       // Fetch both endpoints in parallel
@@ -94,10 +84,9 @@ const make = Effect.gen(function* () {
     })
   )
 
-  return { fetch }
-})
+    return { fetch }
+  })
+}) {}
 
-/**
- * Aori Provider Layer
- */
-export const AoriProviderLive = Layer.effect(AoriProvider, make)
+
+

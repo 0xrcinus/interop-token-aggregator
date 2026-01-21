@@ -6,10 +6,10 @@
 import { Layer } from "effect"
 import { DatabaseLive } from "../db/layer"
 import { AllProvidersLive } from "../providers"
-import { ProviderApiService, ProviderApiServiceLive } from "./providers"
-import { ChainApiService, ChainApiServiceLive } from "./chains"
-import { TokenApiService, TokenApiServiceLive } from "./tokens"
-import { AdminApiService, AdminApiServiceLive } from "./admin"
+import { ProviderApiService } from "./providers"
+import { ChainApiService } from "./chains"
+import { TokenApiService } from "./tokens"
+import { AdminApiService } from "./admin"
 
 /**
  * Export all services and types
@@ -24,15 +24,16 @@ export type { FetchResponse } from "./admin"
 /**
  * Combined API layer with all services and database
  * Uses Layer.provideMerge to provide DatabaseLive to all service layers
+ * Now using Effect.Service pattern with .Default auto-generated layers
  */
-const ProvidersLive = ProviderApiServiceLive.pipe(Layer.provideMerge(DatabaseLive))
-const ChainsLive = ChainApiServiceLive.pipe(Layer.provideMerge(DatabaseLive))
-const TokensLive = TokenApiServiceLive.pipe(Layer.provideMerge(DatabaseLive))
+const ProvidersLive = ProviderApiService.Default.pipe(Layer.provideMerge(DatabaseLive))
+const ChainsLive = ChainApiService.Default.pipe(Layer.provideMerge(DatabaseLive))
+const TokensLive = TokenApiService.Default.pipe(Layer.provideMerge(DatabaseLive))
 
 /**
  * Admin service requires AllProvidersLive (which includes DatabaseLive)
  */
-const AdminLive = AdminApiServiceLive.pipe(Layer.provideMerge(AllProvidersLive))
+const AdminLive = AdminApiService.Default.pipe(Layer.provideMerge(AllProvidersLive))
 
 /**
  * All API services in one layer

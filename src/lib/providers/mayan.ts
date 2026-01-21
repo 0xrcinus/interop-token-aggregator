@@ -1,13 +1,9 @@
-import { Context, Effect, Layer } from "effect"
-import * as Schema from "@effect/schema/Schema"
-import * as Pg from "@effect/sql-drizzle/Pg"
-import { HttpClient } from "@effect/platform"
-import type { Scope } from "effect"
+import { Effect, Schema } from "effect"
 import { fetchJson } from "./http"
 import { normalizeAddress } from "../aggregation/normalize"
 import { categorizeToken } from "../aggregation/categorize"
 import { isEvmChain } from "../aggregation/chain-mapping"
-import { Chain, Token, ProviderResponse, ProviderError } from "./types"
+import type { Chain, Token, ProviderResponse } from "./types"
 import { createProviderFetch } from "./factory"
 
 const PROVIDER_NAME = "mayan"
@@ -63,81 +59,71 @@ const MayanResponseSchema = Schema.Record({
 /**
  * Mayan Provider Service
  */
-export class MayanProvider extends Context.Tag("MayanProvider")<
-  MayanProvider,
-  {
-    readonly fetch: Effect.Effect<ProviderResponse, ProviderError, HttpClient.HttpClient | Scope.Scope | Pg.PgDrizzle>
-  }
->() {}
+export class MayanProvider extends Effect.Service<MayanProvider>()("MayanProvider", {
+  effect: Effect.gen(function* () {
+    const fetch = createProviderFetch(
+      PROVIDER_NAME,
+      Effect.gen(function* () {
+        // Fetch token data
+        const raw = yield* fetchJson(API_URL)
+        const response = yield* Schema.decodeUnknown(MayanResponseSchema)(raw)
 
-const make = Effect.gen(function* () {
-  const fetch = createProviderFetch(
-    PROVIDER_NAME,
-    Effect.gen(function* () {
-      // Fetch token data
-      const raw = yield* fetchJson(API_URL)
-      const response = yield* Schema.decodeUnknown(MayanResponseSchema)(raw)
+        const chainIds = new Set<number>()
+        const tokens: Token[] = []
 
-      const chainIds = new Set<number>()
-      const tokens: Token[] = []
+        for (const [chainName, chainTokens] of Object.entries(response)) {
+          if (!Array.isArray(chainTokens)) continue
+          if (NON_EVM_CHAINS.has(chainName.toLowerCase())) continue
 
-      for (const [chainName, chainTokens] of Object.entries(response)) {
-        if (!Array.isArray(chainTokens)) continue
-        if (NON_EVM_CHAINS.has(chainName.toLowerCase())) continue
+          for (const token of chainTokens) {
+            // Use contract field for EVM chains
+            const address = token.contract || ""
+            if (!address || !EVM_ADDRESS_REGEX.test(address)) continue
 
-        for (const token of chainTokens) {
-          // Use contract field for EVM chains
-          const address = token.contract || ""
-          if (!address || !EVM_ADDRESS_REGEX.test(address)) continue
+            // Map wormhole ID to EVM ID
+            const chainId = token.wChainId
+              ? WORMHOLE_TO_EVM_CHAIN[token.wChainId]
+              : token.chainId || 0
 
-          // Map wormhole ID to EVM ID
-          const chainId = token.wChainId
-            ? WORMHOLE_TO_EVM_CHAIN[token.wChainId]
-            : token.chainId || 0
+            if (!chainId) continue
 
-          if (!chainId) continue
+            chainIds.add(chainId)
 
-          chainIds.add(chainId)
+            const isEvm = isEvmChain(chainId)
+            const normalizedAddress = normalizeAddress(address, isEvm)
+            const tags = categorizeToken(token.symbol, token.name, normalizedAddress)
 
-          const isEvm = isEvmChain(chainId)
-          const normalizedAddress = normalizeAddress(address, isEvm)
-          const tags = categorizeToken(token.symbol, token.name, normalizedAddress)
-
-          tokens.push({
-            address: normalizedAddress,
-            symbol: token.symbol,
-            name: token.name,
-            decimals: token.decimals,
-            chainId,
-            logoURI: token.logoURI,
-            tags,
-          })
+            tokens.push({
+              address: normalizedAddress,
+              symbol: token.symbol,
+              name: token.name,
+              decimals: token.decimals,
+              chainId,
+              logoURI: token.logoURI,
+              tags,
+            })
+          }
         }
-      }
 
-      // Infer chains from tokens
-      const chains: Chain[] = Array.from(chainIds).map((id) => ({
-        id,
-        name: `Chain ${id}`,
-        nativeCurrency: {
-          name: "Unknown",
-          symbol: "Unknown",
-          decimals: 18,
-        },
-      }))
+        // Infer chains from tokens
+        const chains: Chain[] = Array.from(chainIds).map((id) => ({
+          id,
+          name: `Chain ${id}`,
+          nativeCurrency: {
+            name: "Unknown",
+            symbol: "Unknown",
+            decimals: 18,
+          },
+        }))
 
-      console.log(
-        `[${PROVIDER_NAME}] Found ${chains.length} chains and ${tokens.length} tokens`
-      )
+        console.log(
+          `[${PROVIDER_NAME}] Found ${chains.length} chains and ${tokens.length} tokens`
+        )
 
-      return { chains, tokens }
-    })
-  )
+        return { chains, tokens }
+      })
+    )
 
-  return { fetch }
-})
-
-/**
- * Mayan Provider Layer
- */
-export const MayanProviderLive = Layer.effect(MayanProvider, make)
+    return { fetch }
+  })
+}) {}
