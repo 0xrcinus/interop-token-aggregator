@@ -222,10 +222,10 @@ Audit log of all fetch attempts with success/error tracking.
 
 ### Address Normalization
 
-Handles both EVM and non-EVM chains correctly:
+Handles both EVM and non-EVM chains:
 - **EVM chains** (Ethereum, Polygon, etc.): Addresses lowercased (`0xabc...`) since they're case-insensitive
 - **Solana**: Addresses preserve original case since they use case-sensitive encoding (base58)
-- **Other chains**: Currently lowercased, no special handling
+- **Other non-EVM chains**: Currently lowercased without special handling. Proper support for Starknet, Bitcoin, Cosmos, etc. is a TODO.
 
 ### Chain ID Mapping
 
@@ -235,6 +235,8 @@ Some providers use different IDs for the same chain. For example, Solana:
 - Across uses: `34268394551451`
 
 The system normalizes these to a canonical ID (Across's `34268394551451`) so tokens from all providers appear under one unified Solana chain.
+
+**Note**: Only Solana is currently consolidated. Other non-EVM chains (Starknet, Bitcoin, Cosmos, etc.) need mapping additions.
 
 ### Conflict Detection
 
@@ -261,6 +263,7 @@ List aggregated tokens grouped by symbol.
 - `offset` (default: 0) - Pagination offset
 - `symbol` (optional) - Filter by symbol (case-insensitive partial match)
 - `tag` (optional) - Filter by category tag
+- `chainId` (optional) - Filter by chain ID
 
 **Response**:
 ```json
@@ -372,16 +375,23 @@ Provider detail page showing all tokens with chain support.
 - `offset` (default: 0) - Pagination offset
 - `symbol` (optional) - Filter by symbol
 
-### POST `/admin/fetch`
+### POST/GET `/admin/fetch`
 
 Trigger background fetch job for all providers.
 
-**Authentication**: Requires `x-admin-secret` header matching `ADMIN_SECRET` env var.
+**Authentication**:
+- Manual trigger: Requires `x-admin-secret` header matching `ADMIN_SECRET` env var
+- Vercel Cron: Uses `Authorization: Bearer <CRON_SECRET>` (automatically set by Vercel)
 
 **Response**: `202 Accepted` (job runs asynchronously)
 
 ```bash
+# POST request (manual trigger)
 curl -X POST http://localhost:3000/api/admin/fetch \
+  -H "x-admin-secret: your-secret-here"
+
+# GET request (for cron compatibility)
+curl http://localhost:3000/api/admin/fetch \
   -H "x-admin-secret: your-secret-here"
 ```
 
@@ -707,19 +717,19 @@ export const revalidate = 300
 
 ### 3. Automatic Scheduled Fetches (Production)
 
-The application includes a Vercel Cron Job that automatically fetches fresh data every 12 hours:
+The application includes a Vercel Cron Job that automatically fetches fresh data daily:
 
 **Configuration**: See [vercel.json](vercel.json)
 ```json
 {
   "crons": [{
     "path": "/api/admin/fetch",
-    "schedule": "0 9 * * *"
+    "schedule": "0 11 * * *"
   }]
 }
 ```
 
-**Cron Schedule**: `0 9 * * *` = Every 24 hours at 9:00 AM, 12:00 PM UTC
+**Cron Schedule**: `0 11 * * *` = Every day at 11:00 AM UTC
 
 **How it Works**:
 - Vercel automatically calls `GET /api/admin/fetch` on the defined schedule
@@ -742,7 +752,7 @@ See [Vercel Cron documentation](https://vercel.com/docs/cron-jobs) for more sche
 
 2. **Conflict Detection Only**: Conflicts (same token, same chain, different addresses/decimals) are detected but not automatically resolved. No provider priority system yet.
 
-3. **Limited Non-EVM Support**: Only Solana properly consolidated. Other non-EVM chains (Starknet, Bitcoin, Cosmos, etc.) need mapping additions.
+3. **Limited Non-EVM Support**: Only Solana has proper chain ID consolidation and address case-preservation. Other non-EVM chains (Starknet, Bitcoin, Cosmos, Tron, etc.) lack chain mappings and may have incorrect address normalization.
 
 ---
 
@@ -918,7 +928,7 @@ pnpm build
 
 ## License
 
-MIT License - Copyright (c) 2023 Wonder LTD
+MIT License
 
 See [LICENSE](LICENSE) for full license text.
 
