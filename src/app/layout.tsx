@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import "./globals.css"
 import { QueryProvider } from "@/components/query-provider"
+import { NavMenu } from "@/components/nav-menu"
 import Link from "next/link"
 
 export const metadata: Metadata = {
@@ -29,6 +30,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
+        <NavMenu />
         <QueryProvider>{children}</QueryProvider>
         <footer className="border-t py-4 mt-12">
           <div className="max-w-7xl mx-auto px-8 sm:px-20">
