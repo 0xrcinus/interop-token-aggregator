@@ -31,7 +31,7 @@ export default async function Home() {
   const [providersData, chainsData] = await Promise.all([getProviders(), getChains()])
 
   return (
-    <div className="min-h-screen p-8 pb-20 sm:p-20">
+    <div className="min-h-screen pt-8 pb-20 px-8 sm:px-20">
       <main className="max-w-7xl mx-auto space-y-12">
         {/* Header */}
         <header className="space-y-3 text-center">

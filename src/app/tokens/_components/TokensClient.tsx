@@ -1,8 +1,8 @@
 "use client"
 
 import { useRouter, useSearchParams } from "next/navigation"
-import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -59,12 +59,9 @@ export function TokensClient() {
   }
 
   return (
-    <div className="min-h-screen p-8 pb-20 sm:p-20">
+    <div className="min-h-screen pt-8 pb-20 px-8 sm:px-20">
       <main className="max-w-7xl mx-auto space-y-8">
         <header className="space-y-2">
-          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Back to Dashboard
-          </Link>
           <h1 className="text-4xl font-bold">Token Search</h1>
           <p className="text-lg text-muted-foreground">
             Search and compare tokens across chains and providers

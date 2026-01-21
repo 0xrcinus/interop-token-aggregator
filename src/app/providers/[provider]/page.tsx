@@ -32,12 +32,9 @@ export default async function ProviderDetailPage({
   const data = await getProviderMetadata(provider)
 
   return (
-    <div className="min-h-screen p-8 pb-20 sm:p-20">
+    <div className="min-h-screen pt-8 pb-20 px-8 sm:px-20">
       <main className="max-w-7xl mx-auto space-y-8">
         <header className="space-y-2">
-          <Link href="/providers" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Back to Providers
-          </Link>
           <h1 className="text-4xl font-bold capitalize">{provider}</h1>
           <p className="text-lg text-muted-foreground">
             Viewing {data.totalTokens.toLocaleString()} token instances across {data.uniqueSymbols.toLocaleString()} unique symbols

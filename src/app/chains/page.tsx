@@ -1,4 +1,3 @@
-import Link from "next/link"
 import { Effect } from "effect"
 import { ChainApiService, ApiServicesLive } from "@/lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,12 +20,9 @@ export default async function ChainsPage() {
   const data = await getChains()
 
   return (
-    <div className="min-h-screen p-8 pb-20 sm:p-20">
+    <div className="min-h-screen pt-8 pb-20 px-8 sm:px-20">
       <main className="max-w-7xl mx-auto space-y-8">
         <header className="space-y-2">
-          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Back to Dashboard
-          </Link>
           <h1 className="text-4xl font-bold">Chain Coverage</h1>
           <p className="text-lg text-muted-foreground">
             View which chains are supported by which providers

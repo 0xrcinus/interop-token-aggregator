@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, X, Database, Coins, Network } from "lucide-react"
+import { Menu, Database, Coins, Network, Server } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -15,9 +15,9 @@ import { useState } from "react"
 
 const navItems = [
   { href: "/", label: "Home", icon: Database },
-  { href: "/tokens", label: "Tokens", icon: Coins },
+  { href: "/providers", label: "Providers", icon: Server },
   { href: "/chains", label: "Chains", icon: Network },
-  { href: "/providers", label: "Providers", icon: Database },
+  { href: "/tokens", label: "Tokens", icon: Coins },
 ]
 
 export function NavMenu() {

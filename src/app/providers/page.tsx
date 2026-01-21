@@ -1,5 +1,5 @@
-import Link from "next/link"
 import { Effect } from "effect"
+import Link from "next/link"
 import { ProviderApiService, ApiServicesLive } from "@/lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -22,12 +22,9 @@ export default async function ProvidersPage() {
   const data = await getProviders()
 
   return (
-    <div className="min-h-screen p-8 pb-20 sm:p-20">
+    <div className="min-h-screen pt-8 pb-20 px-8 sm:px-20">
       <main className="max-w-7xl mx-auto space-y-8">
         <header className="space-y-2">
-          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Back to Dashboard
-          </Link>
           <h1 className="text-4xl font-bold">Providers</h1>
           <p className="text-lg text-muted-foreground">
             Browse all {data.summary.total} bridge providers and their token coverage

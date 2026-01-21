@@ -42,11 +42,8 @@ export default async function TokenDetailPage({
     data = await getTokenDetail(symbol)
   } catch (error) {
     return (
-      <div className="min-h-screen p-8 pb-20 sm:p-20">
+      <div className="min-h-screen pt-8 pb-20 px-8 sm:px-20">
         <main className="max-w-7xl mx-auto space-y-8">
-          <Link href="/tokens" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Back to Tokens
-          </Link>
           <Card>
             <CardContent className="py-8 text-center">
               <p className="text-lg text-muted-foreground">
@@ -60,12 +57,9 @@ export default async function TokenDetailPage({
   }
 
   return (
-    <div className="min-h-screen p-8 pb-20 sm:p-20">
+    <div className="min-h-screen pt-8 pb-20 px-8 sm:px-20">
       <main className="max-w-7xl mx-auto space-y-8">
         <header className="space-y-2">
-          <Link href="/tokens" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Back to Tokens
-          </Link>
           <div className="flex items-center gap-4">
             <h1 className="text-4xl font-bold font-mono">{data.symbol}</h1>
             {data.summary.hasConflicts && (

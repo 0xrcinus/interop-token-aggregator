@@ -41,12 +41,9 @@ export default async function ChainDetailPage({
   const data = await getChainMetadata(chainId)
 
   return (
-    <div className="min-h-screen p-8 pb-20 sm:p-20">
+    <div className="min-h-screen pt-8 pb-20 px-8 sm:px-20">
       <main className="max-w-7xl mx-auto space-y-8">
         <header className="space-y-2">
-          <Link href="/chains" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Back to Chains
-          </Link>
           <div className="flex items-center gap-3">
             {data.icon && <ChainIcon icon={data.icon} name={data.name} size={48} />}
             <div>
