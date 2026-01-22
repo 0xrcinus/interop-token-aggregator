@@ -2,7 +2,7 @@
 
 **Status**: Phase 9 Complete - All 12 Providers Operational
 **Next Phase**: Phase 10 - Conflict Resolution & Materialized Views
-**Last Updated**: 2026-01-20
+**Last Updated**: 2026-01-22
 
 ---
 
@@ -360,6 +360,166 @@ export const CHAIN_ID_MAPPINGS: Record<string, Record<number, number>> = {
 
 ---
 
+## Chain Registry (Multi-Source Metadata)
+
+### Overview
+
+The chain registry fetches and enriches chain metadata from multiple sources with a layered approach:
+
+**Primary Source: chainlist.org/rpcs.json**
+- Higher quality data with better maintenance
+- More accurate chain information
+- Example: Chain 999 correctly identified as "HyperEVM"
+
+**Fallback Source: chainid.network/chains.json**
+- Broader coverage (2,490+ chains)
+- Comprehensive historical data
+- Fills gaps for chains not in chainlist.org
+
+**Manual Overrides: manual-overrides.ts**
+- Corrections for incorrect/outdated data from both sources
+- Applied as the final layer after merging
+- Example: Chain 999 explorer fixed from broken "Purrsec" to working "Hypurrscan"
+
+### Merging Strategy
+
+```typescript
+// src/lib/chains/registry.ts
+
+// 1. Fetch from fallback source (chainid.network)
+const fallbackChains = yield* fetchChainidNetwork()
+
+// 2. Add fallback chains to map
+for (const chain of fallbackChains) {
+  if (!isTestnet(chain)) {
+    chainMap.set(chain.chainId, chain)
+  }
+}
+
+// 3. Override with primary source (chainlist.org) - higher quality
+for (const chain of primaryChains) {
+  if (!isTestnet(chain)) {
+    chainMap.set(chain.chainId, chain) // Overwrites fallback data
+  }
+}
+```
+
+**Result**: Chainlist.org takes precedence for overlapping chains, chainid.network fills gaps.
+
+### Testnet Filtering
+
+Automatically excludes testnets using two methods:
+
+1. **Explicit fields**: `isTestnet: true` (chainlist.org) or `testnet: true` (chainid.network)
+2. **Name-based detection**: Filters chains with keywords:
+   - testnet, sepolia, goerli, ropsten, rinkeby, kovan
+   - mumbai, fuji, chapel, sandbox
+
+**Before filtering**: 2,490+ chains from chainid.network
+**After filtering**: 1,522 mainnet chains
+
+### Schema Flexibility
+
+The registry uses flexible schemas to handle API changes gracefully:
+
+**Variable field types**:
+- `icon`: Can be `string` or `{url, format, width, height}` object
+- `features`: Can be `string[]` or `{name: string}[]`
+- `faucets`: Can be `string` or `string[]`
+- `explorers.standard`: Optional (some chains don't provide it)
+
+**Schema options**:
+```typescript
+Schema.decodeUnknown(
+  Schema.Array(ChainlistOrgSchema),
+  {
+    errors: "all",              // Report all errors for debugging
+    onExcessProperty: "ignore"  // Ignore unknown fields (forward compatibility)
+  }
+)
+```
+
+**Benefits**:
+- Handles inconsistent API responses without breaking
+- Automatic normalization of union types to consistent format
+- Graceful degradation if primary source fails or changes
+
+### Data Normalization
+
+Transform functions normalize union types to consistent format:
+
+```typescript
+// Icon normalization
+const icon = chain.icon
+  ? typeof chain.icon === 'string'
+    ? chain.icon              // Keep string as-is
+    : chain.icon.url          // Extract URL from object
+  : undefined
+
+// Faucets normalization
+const faucets = chain.faucets
+  ? typeof chain.faucets === 'string'
+    ? [chain.faucets]         // Wrap string in array
+    : chain.faucets           // Keep array as-is
+  : undefined
+
+// Features normalization
+const features = Array.isArray(chain.features) && chain.features.length > 0
+  ? typeof chain.features[0] === 'string'
+    ? chain.features.map(name => ({ name }))  // Convert string[] to object[]
+    : chain.features                           // Keep object[] as-is
+  : undefined
+```
+
+### Manual Overrides
+
+For cases where both chainlist.org and chainid.network have incorrect or outdated data, we maintain manual overrides:
+
+**File**: `src/lib/chains/manual-overrides.ts`
+
+**Structure**:
+```typescript
+export const MANUAL_CHAIN_OVERRIDES: Record<number, Partial<ChainMetadata>> = {
+  // HyperEVM (999) - Fix broken explorer
+  999: {
+    explorers: [
+      {
+        name: "Hypurrscan",
+        url: "https://hypurrscan.io",
+        standard: "EIP3091",
+      },
+    ],
+  },
+}
+```
+
+**Application**:
+- Applied as the final step after merging primary and fallback sources
+- Only specified fields are overridden (partial merge)
+- Full type safety with `Partial<ChainMetadata>`
+
+**Example fixes**:
+- Chain 999: Explorer "Purrsec" (broken) → "Hypurrscan" (working)
+
+**When to add overrides**:
+- Broken or outdated URLs (explorers, RPC endpoints)
+- Incorrect chain names or metadata
+- Missing critical information
+- Temporary fixes while waiting for upstream updates
+
+### Results
+
+**Enrichment improvement**: 175 → 183 chains enriched (8 additional chains from chainlist.org)
+
+**Fixed data quality issues**:
+- Chain 999: "Wanchain Testnet" → "HyperEVM" ✓
+- Chain 1: Better RPC endpoints and explorer data
+- Chain 137: Updated Polygon metadata
+
+**Testnet reduction**: 4 chains with "testnet" in name → 2 edge cases
+
+---
+
 ## Token Categorization System
 
 ### 8 Categories
@@ -665,7 +825,7 @@ src/
 │   ├── chains/
 │   │   ├── canonical-metadata.ts     # Canonical chain metadata (non-EVM)
 │   │   ├── enrichment.ts             # Chain enrichment logic
-│   │   └── registry.ts               # ChainRegistry (Chainlist API)
+│   │   └── registry.ts               # ChainRegistry (dual-source: chainlist.org + chainid.network)
 │   ├── db/
 │   │   ├── layer.ts                  # SqlLive, DrizzleLive, DatabaseLive
 │   │   └── schema.ts                 # 4 tables with enhanced chain metadata

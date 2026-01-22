@@ -19,7 +19,7 @@ Fetches token data from 12 interoperability providers and answers questions like
 - **34k+ tokens** across **217 chains**
 - Data from **12 providers**: Relay, LiFi, Across, Stargate, DeBridge, Mayan, Rhino.fi, GasZip, Aori, Eco, Meson, Butter
 - Tokens categorized into 8 types: wrapped, stablecoin, liquidity-pool, governance, bridged, yield-bearing, rebasing, native
-- Chain metadata enriched from Chainlist API (logos, explorers, RPC endpoints)
+- Chain metadata enriched from dual sources: chainlist.org (primary) and chainid.network (fallback), with manual overrides for incorrect data and automatic testnet filtering
 - Both EVM and non-EVM chains (Solana, Bitcoin, etc.) with proper address normalization
 
 ### Key Features
@@ -153,7 +153,7 @@ interop-token-aggregator/
 │   ├── lib/
 │   │   ├── api/                      # Effect-TS API service layer
 │   │   ├── aggregation/              # Address normalization, categorization, chain mapping
-│   │   ├── chains/                   # Chain metadata enrichment (Chainlist API)
+│   │   ├── chains/                   # Chain metadata enrichment (dual-source: chainlist.org + chainid.network)
 │   │   ├── db/                       # Drizzle ORM schema and layers
 │   │   └── providers/                # Provider implementations (12 total)
 │   │       ├── factory.ts            # Shared provider fetch pipeline
@@ -183,7 +183,7 @@ interop-token-aggregator/
 PostgreSQL 16 with 4 core tables:
 
 ### `chains`
-Normalized chain data with enriched metadata from Chainlist API.
+Normalized chain data with enriched metadata from dual sources (chainlist.org primary, chainid.network fallback).
 
 **Key fields**:
 - `chain_id` (bigint) - Chain ID (supports IDs > 2 billion like Across's 34268394551451)
@@ -217,7 +217,7 @@ Audit log of all fetch attempts with success/error tracking.
 1. **Parallel Fetching**: Queries all 12 provider APIs concurrently (~3.2 seconds total)
 2. **Normalization**: Converts each provider's data format into a unified schema
 3. **Storage**: Saves chains, tokens, and provider relationships to PostgreSQL
-4. **Enrichment**: Fetches chain metadata (logos, explorers) from Chainlist API
+4. **Enrichment**: Fetches chain metadata from dual sources - chainlist.org (primary, higher quality) and chainid.network (fallback, broader coverage). Applies manual overrides for incorrect data, automatically filters out testnets, and handles schema variations gracefully.
 5. **Categorization**: Tags tokens automatically (stablecoin, wrapped, LP, etc.)
 
 ### Address Normalization
@@ -627,6 +627,9 @@ Instead of hardcoding chain types, the system stores `vm_type` from provider dat
 **6. Batch Inserts for Performance**
 Large token lists are inserted in batches of 500 records to prevent stack overflow and improve database performance.
 
+**7. Multi-Source Chain Registry with Manual Overrides**
+Chain metadata comes from three layers: chainlist.org (primary, higher quality), chainid.network (fallback, broader coverage), and manual overrides for incorrect data. The registry uses flexible schemas with union types to handle inconsistent API responses gracefully, and automatically filters out testnets. Manual overrides are applied last to fix broken URLs or incorrect information from both sources (e.g., Chain 999 explorer fix).
+
 ### Effect-TS Architecture
 
 The application uses Effect-TS for functional error handling and dependency injection. Key patterns:
@@ -939,9 +942,9 @@ See [LICENSE](LICENSE) for full license text.
 - **[Wonderland](https://wonderland.xyz)**: Project development and maintenance
 - **Effect-TS Team**: For the excellent functional programming framework
 - **Drizzle Team**: For the type-safe ORM
-- **Chainlist API**: For chain metadata enrichment
+- **Chainlist.org & Chainid.network**: For comprehensive chain metadata
 - **Provider Teams**: Relay, LiFi, Across, Stargate, DeBridge, Mayan, Rhino.fi, GasZip, Aori, Eco, Meson, Butter
 
 ---
 
-Last Updated: 2026-01-21
+Last Updated: 2026-01-22

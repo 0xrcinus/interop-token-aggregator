@@ -3,12 +3,14 @@
  * Fetches and enriches chain metadata from multiple sources:
  * 1. Primary: chainlist.org/rpcs.json (higher quality data)
  * 2. Fallback: chainid.network/chains.json (more comprehensive)
+ * 3. Manual overrides: manual-overrides.ts (corrections for incorrect data)
  *
  * Excludes testnets from both sources.
  */
 
 import { Effect, Schema } from "effect"
 import { HttpClient } from "@effect/platform"
+import { applyManualOverrides } from "./manual-overrides"
 
 // Base fields shared by both sources
 // Using loose schemas to handle API changes gracefully
@@ -362,10 +364,10 @@ export class ChainRegistry extends Effect.Service<ChainRegistry>()("ChainRegistr
           }
         }
 
-        // Get final metadata array
-        const metadata: ChainMetadata[] = Array.from(chainMap.values())
+        // Get final metadata array and apply manual overrides
+        const metadata: ChainMetadata[] = Array.from(chainMap.values()).map(applyManualOverrides)
 
-        console.log(`[ChainRegistry] Successfully merged ${metadata.length} mainnet chains`)
+        console.log(`[ChainRegistry] Successfully merged ${metadata.length} mainnet chains (with manual overrides applied)`)
 
         return metadata
       }).pipe(Effect.scoped)
