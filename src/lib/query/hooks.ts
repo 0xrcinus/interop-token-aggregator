@@ -31,6 +31,7 @@ export const queryKeys = {
   chains: {
     all: ["chains"] as const,
     list: () => ["chains", "list"] as const,
+    metadata: () => ["chains", "metadata"] as const,
     tokens: (params: ChainTokensQueryParams) =>
       ["chains", "tokens", params] as const,
   },
@@ -77,6 +78,15 @@ export function useChains() {
   return useQuery({
     queryKey: queryKeys.chains.list(),
     queryFn: () => chainsApi.list(),
+  })
+}
+
+export function useChainMetadata() {
+  return useQuery({
+    queryKey: queryKeys.chains.metadata(),
+    queryFn: () => chainsApi.metadata(),
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    gcTime: 10 * 60 * 1000,   // Keep in cache for 10 minutes
   })
 }
 

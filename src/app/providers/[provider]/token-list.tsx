@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input"
 import { AddressDisplay } from "@/components/address-display"
 import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react"
-import { useProviderTokens, useChains } from "@/lib/query/hooks"
+import { useProviderTokens, useChainMetadata } from "@/lib/query/hooks"
 import { getTokenExplorerUrl } from "@/lib/utils/explorer"
 
 // Tag color mapping
@@ -46,8 +46,8 @@ export function ProviderTokenList({ provider }: ProviderTokenListProps) {
     search: search || undefined,
   })
 
-  // Fetch chain metadata for explorer URLs
-  const { data: chainsData } = useChains()
+  // Fetch lightweight chain metadata for explorer URLs (no aggregations)
+  const { data: chainsData } = useChainMetadata()
   const chainMap = new Map(chainsData?.chains.map(c => [c.chainId, c]) ?? [])
 
   const tokens = data?.tokens ?? []

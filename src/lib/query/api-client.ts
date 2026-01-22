@@ -150,9 +150,29 @@ export interface ChainTokensResponse {
   }
 }
 
+export interface ChainMetadata {
+  readonly chainId: number
+  readonly name: string
+  readonly shortName?: string
+  readonly icon?: string
+  readonly explorers?: ReadonlyArray<{
+    readonly name: string
+    readonly url: string
+    readonly standard: string
+  }>
+}
+
+export interface ChainMetadataResponse {
+  readonly chains: ReadonlyArray<ChainMetadata>
+}
+
 export const chainsApi = {
   list: async (): Promise<ChainsResponse> => {
     return fetchJson<ChainsResponse>(`${BASE_URL}/api/chains`)
+  },
+
+  metadata: async (): Promise<ChainMetadataResponse> => {
+    return fetchJson<ChainMetadataResponse>(`${BASE_URL}/api/chains/metadata`)
   },
 
   getTokens: async (

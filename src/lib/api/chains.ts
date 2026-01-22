@@ -180,6 +180,29 @@ export class ChainApiService extends Effect.Service<ChainApiService>()("ChainApi
       )
     )
 
-    return { getChains, getChainById }
+    const getChainMetadata = Effect.gen(function* () {
+      // Lightweight query - just fetch chain metadata without aggregations
+      const chainList = yield* drizzle
+        .select({
+          chainId: chains.chainId,
+          name: chains.name,
+          shortName: chains.shortName,
+          icon: chains.icon,
+          explorers: chains.explorers,
+        })
+        .from(chains)
+
+      return chainList.map((chain) => ({
+        chainId: chain.chainId,
+        name: chain.name,
+        shortName: chain.shortName ?? undefined,
+        icon: chain.icon ?? undefined,
+        explorers: chain.explorers as any ?? undefined,
+      }))
+    }).pipe(
+      Effect.mapError((error) => new ChainApiError("Failed to fetch chain metadata", error))
+    )
+
+    return { getChains, getChainById, getChainMetadata }
   })
 }) {}
