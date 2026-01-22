@@ -78,6 +78,7 @@ for domain in \
     "across.to" \
     "api.1inch.dev" \
     "chainid.network" \
+    "chainlist.org" \
     "stargate.finance" \
     "dln.debridge.finance" \
     "price-api.mayan.finance" \

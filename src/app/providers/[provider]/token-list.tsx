@@ -9,7 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input"
 import { AddressDisplay } from "@/components/address-display"
 import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react"
-import { useProviderTokens } from "@/lib/query/hooks"
+import { useProviderTokens, useChains } from "@/lib/query/hooks"
+import { getTokenExplorerUrl } from "@/lib/utils/explorer"
 
 // Tag color mapping
 const tagColors: Record<string, string> = {
@@ -44,6 +45,10 @@ export function ProviderTokenList({ provider }: ProviderTokenListProps) {
     offset: (page - 1) * itemsPerPage,
     search: search || undefined,
   })
+
+  // Fetch chain metadata for explorer URLs
+  const { data: chainsData } = useChains()
+  const chainMap = new Map(chainsData?.chains.map(c => [c.chainId, c]) ?? [])
 
   const tokens = data?.tokens ?? []
   const total = data?.pagination?.total ?? 0
@@ -214,25 +219,38 @@ export function ProviderTokenList({ provider }: ProviderTokenListProps) {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {token.chains.map((chain) => (
-                                  <TableRow key={`${chain.chainId}-${chain.address}`} className="border-muted/30 hover:bg-transparent">
-                                    <TableCell className="py-2">
-                                      <Link
-                                        href={`/chains/${chain.chainId}`}
-                                        className="text-sm hover:text-primary"
-                                      >
-                                        {chain.chainName}
-                                      </Link>
-                                    </TableCell>
-                                    <TableCell className="py-2 text-sm">{chain.name}</TableCell>
-                                    <TableCell className="py-2">
-                                      <AddressDisplay address={chain.address} truncate />
-                                    </TableCell>
-                                    <TableCell className="py-2 text-sm text-right">
-                                      {chain.decimals ?? <span className="text-muted-foreground">—</span>}
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
+                                {token.chains.map((chain) => {
+                                  const chainInfo = chainMap.get(chain.chainId)
+                                  const explorerUrl = getTokenExplorerUrl(
+                                    chain.chainId,
+                                    chain.address,
+                                    chainInfo?.explorers as any
+                                  )
+
+                                  return (
+                                    <TableRow key={`${chain.chainId}-${chain.address}`} className="border-muted/30 hover:bg-transparent">
+                                      <TableCell className="py-2">
+                                        <Link
+                                          href={`/chains/${chain.chainId}`}
+                                          className="text-sm hover:text-primary"
+                                        >
+                                          {chain.chainName}
+                                        </Link>
+                                      </TableCell>
+                                      <TableCell className="py-2 text-sm">{chain.name}</TableCell>
+                                      <TableCell className="py-2">
+                                        <AddressDisplay
+                                          address={chain.address}
+                                          explorerUrl={explorerUrl || undefined}
+                                          truncate
+                                        />
+                                      </TableCell>
+                                      <TableCell className="py-2 text-sm text-right">
+                                        {chain.decimals ?? <span className="text-muted-foreground">—</span>}
+                                      </TableCell>
+                                    </TableRow>
+                                  )
+                                })}
                               </TableBody>
                             </Table>
                           </TableCell>

@@ -79,7 +79,7 @@ export class RhinoProvider extends Effect.Service<RhinoProvider>()("RhinoProvide
                 address,
                 symbol,
                 name,
-                decimals: tokenData.decimals || 18,
+                decimals: tokenData.decimals,
                 chainId,
                 logoURI: undefined,
                 tags,
