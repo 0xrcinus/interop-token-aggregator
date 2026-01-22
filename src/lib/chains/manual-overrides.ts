@@ -19,8 +19,8 @@ export const MANUAL_CHAIN_OVERRIDES: Record<number, Partial<ChainMetadata>> = {
   999: {
     explorers: [
       {
-        name: "Hypurrscan",
-        url: "https://hypurrscan.io",
+        name: "HyperEVM Explorer",
+        url: "https://hyperevmscan.io/",
         standard: "EIP3091",
       },
     ],
